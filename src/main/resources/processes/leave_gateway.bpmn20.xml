@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd              http://www.omg.org/spec/BPMN/20100524/DI http://www.omg.org/spec/BPMN/2.0/20100501/BPMNDI.xsd              http://www.omg.org/spec/DD/20100524/DC http://www.omg.org/spec/DD/2.0/20100501/DC.xsd              http://www.omg.org/spec/DD/20100524/DI http://www.omg.org/spec/DD/2.0/20100501/DI.xsd" id="Definitions_1" targetNamespace="http://flowable.org/bpmn">
+  <process id="leaveGatewayProcess" name="请假_排他网关流程" isExecutable="true">
+    <startEvent id="startEvent1"/>
+    <sequenceFlow id="flow1" sourceRef="startEvent1" targetRef="gateway1"/>
+    <exclusiveGateway id="gateway1" name="判断请假天数"/>
+    <sequenceFlow id="flow_short" sourceRef="gateway1" targetRef="taskManager">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${dayCount <=2}]]></conditionExpression>
+    </sequenceFlow>
+    <userTask id="taskManager" name="主管审批" flowable:assignee="zhangsan"/>
+    <sequenceFlow id="flow_end1" sourceRef="taskManager" targetRef="endEvent1"/>
+    <sequenceFlow id="flow_long" sourceRef="gateway1" targetRef="taskBoss">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${dayCount >2}]]></conditionExpression>
+    </sequenceFlow>
+    <userTask id="taskBoss" name="经理审批" flowable:assignee="lisi"/>
+    <sequenceFlow id="flow_end2" sourceRef="taskBoss" targetRef="endEvent1"/>
+    <endEvent id="endEvent1"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="leaveGatewayProcess">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="startEvent1">
+        <dc:Bounds x="65.0" y="97.0" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1_shape" bpmnElement="gateway1">
+        <dc:Bounds x="230" y="90" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Manager_shape" bpmnElement="taskManager">
+        <dc:Bounds x="350.0" y="-15.0" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Boss_shape" bpmnElement="taskBoss">
+        <dc:Bounds x="360" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_shape" bpmnElement="endEvent1">
+        <dc:Bounds x="620.0" y="110.0" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_flow1" bpmnElement="flow1">
+        <di:waypoint x="101.0" y="115.0"/>
+        <di:waypoint x="230" y="115"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_short" bpmnElement="flow_short">
+        <di:waypoint x="255" y="90"/>
+        <di:waypoint x="350.0" y="25.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_end1" bpmnElement="flow_end1">
+        <di:waypoint x="450.0" y="25.0"/>
+        <di:waypoint x="620.0" y="120.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_long" bpmnElement="flow_long">
+        <di:waypoint x="255" y="140"/>
+        <di:waypoint x="360" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_end2" bpmnElement="flow_end2">
+        <di:waypoint x="460" y="200"/>
+        <di:waypoint x="620.0" y="130.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

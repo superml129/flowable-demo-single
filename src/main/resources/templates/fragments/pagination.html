@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<!-- 公共分页片段 -->
+<div th:fragment="pagination(total,pageNum,pageSize,totalPages,url,sortField,sortOrder)">
+  <div class="page-box">
+    <span>共<span th:text="${total}"></span>条，第<span th:text="${pageNum}"></span>/<span th:text="${totalPages}"></span>页</span>
+
+    <!-- 每页条数下拉 -->
+    <select id="pageSizeSelect" style="padding:5px;border:1px solid #ccc;border-radius:4px;">
+      <option value="10" th:selected="${pageSize ==10}">10条/页</option>
+      <option value="20" th:selected="${pageSize ==20}">20条/页</option>
+      <option value="50" th:selected="${pageSize ==50}">50条/页</option>
+      <option value="100" th:selected="${pageSize ==100}">100条/页</option>
+      <option value="500" th:selected="${pageSize ==500}">500条/页</option>
+    </select>
+
+    <a th:href="@{${url}(pageNum=1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">首页</a>
+    <a th:if="${pageNum > 1}" th:href="@{${url}(pageNum=${pageNum}-1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">上一页</a>
+    <a th:if="${pageNum < totalPages}" th:href="@{${url}(pageNum=${pageNum}+1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">下一页</a>
+    <a th:href="@{${url}(pageNum=${totalPages},pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">末页</a>
+  </div>
+
+  <script th:inline="javascript">
+    /*<![CDATA[*/
+    document.getElementById("pageSizeSelect").onchange = function(){
+      const size = this.value;
+      const targetUrl = /*[[${url}]]*/ '';
+      const sField = /*[[${sortField}]]*/ '';
+      const sOrder = /*[[${sortOrder}]]*/ '';
+      window.location.href = targetUrl + "?pageNum=1&pageSize="+size+"&sortField="+sField+"&sortOrder="+sOrder;
+    }
+    /*]]>*/
+  </script>
+</div>
+</html>

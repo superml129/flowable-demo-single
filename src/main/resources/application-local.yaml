@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    dynamic:
+      datasource:
+        flowable:
+          username: root
+          password: Root@123456
+        userdb:
+          username: root
+          password: Root@123456

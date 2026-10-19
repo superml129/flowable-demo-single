@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>通用审批系统</title>
+    <style>
+        /* 页面整体深蓝背景 */
+        body{
+            background-color: #0F3460;
+            font-family: "Microsoft Yahei",sans-serif;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            min-height:100vh;
+            margin:0;
+        }
+        .login-box {
+            width: 500px;
+            padding: 36px 32px;
+            background: #ffffff;
+            border-radius:16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.15);
+        }
+        h2{
+            text-align:center;
+            font-size:36px;
+            margin-top:0;
+            margin-bottom:24px;
+            color:#222;
+        }
+        .item {
+            display:flex;
+            align-items:center;
+            margin:18px 0;
+        }
+        label{
+            font-size:20px;
+            width:110px;
+        }
+        input{
+            flex:1;
+            font-size:16px;
+            padding:10px 12px;
+            border:1px solid #999;
+            border-radius:6px;
+        }
+        .msg{
+            color:red;
+            text-align:center;
+            font-size:18px;
+            margin-bottom:12px;
+        }
+        button{
+            width:100%;
+            padding:12px;
+            background:#2188ff;
+            color:white;
+            border:none;
+            border-radius:8px;
+            font-size:20px;
+        }
+        /* 验证码行：flex横向排列 */
+        .captcha-row{
+            display:flex;
+            flex:1;
+            align-items:center;
+        }
+        .captcha-row input{
+            flex:1;
+        }
+        .captcha-img{
+            cursor:pointer;
+            border:1px solid #aaa;
+            height:42px;
+            flex-shrink:0; /* 图片不会压缩 */
+        }
+    </style>
+</head>
+<body>
+<div class="login-box">
+    <h3 style="text-align:center">通用审批系统</h3>
+    <div class="msg" th:text="${msg}"></div>
+    <!-- 登录表单，提交地址 /login/doLogin 由Security自动处理 -->
+    <form th:action="@{/login/doLogin}" method="post">
+        <div class="item">
+            <label>用户名：</label>
+            <input type="text" name="username" placeholder="请输入用户名" th:value="${username}">
+        </div>
+        <div class="item">
+            <label>密　码：</label>
+            <input type="password" name="password" placeholder="请输入密码" th:value="${password}">
+        </div>
+        <!-- 验证码行 -->
+        <div class="item captcha-row">
+            <label>验证码：</label>
+            <input type="text" name="captcha" placeholder="输入验证码">
+            <img class="captcha-img" th:src="@{/captcha}" onclick="this.src='/captcha?'+Math.random()" title="点击刷新">
+        </div>
+        <div class="item">
+            <button type="submit">登录</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>提交申请</title>
+  <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+</head>
+<div th:replace="~{fragments/commonNav :: navBar}"></div>
+<body>
+<div class="container">
+  <h3>提交申请</h3>
+
+  <div th:if="${msg}" class="success-msg">
+    [[${msg}]]
+  </div>
+
+  <form th:action="@{/leaveApply/submit}" method="post" class="form-box">
+    <div class="form-item">
+      <label>请假申请人：</label>
+      <input type="text" name="applyUser" required placeholder="请输入申请人账号">
+    </div>
+    <div class="form-item">
+      <label>请假天数：</label>
+      <input type="number" name="leaveDays" min="1" max="30" required placeholder="请假天数">
+    </div>
+    <div class="form-item">
+      <label>请假原因：</label>
+      <textarea name="leaveReason" rows="4" required placeholder="填写请假事由"></textarea>
+    </div>
+    <div class="form-item">
+      <label>审批经理账号：</label>
+      <input type="text" name="manager" required placeholder="填写经理账号，例如 zhangsan">
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="search-btn">提交申请</button>
+    </div>
+  </form>
+</div>
+</body>
+</html>

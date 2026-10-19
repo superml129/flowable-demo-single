@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>审批办理</title>
+    <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+</head>
+<body>
+<div class="container">
+    <h2>审批办理</h2>
+    <form class="form-box" th:action="@{/todoTask/doAudit}" method="post">
+        <div class="form-row">
+            <div class="form-label">任务ID：</div>
+            <div>[[${task.id}]]</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">任务名称：</div>
+            <div>[[${task.name}]]</div>
+        </div>
+        <div class="form-row">
+            <div class="form-label">流程实例ID：</div>
+            <div>[[${task.processInstanceId}]]</div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-label">审批结果：</div>
+            <div class="radio-group">
+                <label>
+                    <input type="radio" name="auditResult" value="pass" checked/> 审批通过
+                </label>
+                <label>
+                    <input type="radio" name="auditResult" value="reject"/> 驳回申请
+                </label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-label">审批意见：</div>
+            <textarea name="auditComment" placeholder="请填写审批意见"></textarea>
+        </div>
+
+        <div class="btn-row">
+            <input type="hidden" th:value="${task?.id}" name="taskId"/>
+            <button class="submit-btn" type="submit">提交审批</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

@@ -1,0 +1,38 @@
+spring:
+  profiles:
+    active: local
+  datasource:
+    dynamic:
+      primary: flowable # 默认数据源：flowable_demo（flowable引擎使用）
+      strict: false
+      datasource:
+        flowable:
+          driver-class-name: com.mysql.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/flowable_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+          username: # 请在application-local.yaml填写真实账号
+          password: # 请在application-local.yaml填写真实密码
+        userdb:
+          driver-class-name: com.mysql.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/flowable_user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+          username: # 请在application-local.yaml填写真实账号
+          password: # 请在application-local.yaml填写真实密码
+# flowable配置
+flowable:
+  # true：启动自动创建ACT_*数据表；生产环境改为false，手动执行脚本
+  database-schema-update: true
+  # 关闭自带web页面（不需要modeler就关掉）
+  rest-api-enabled: false
+# 日志配置
+logging:
+  level:
+    root: info
+    # 应用业务日志，debug看详细信息
+    com.sheldon.flowable_demo: debug
+    # mybatis sql日志，打印执行sql、参数
+    com.sheldon.flowable_demo.mapper: debug
+    # flowable日志，不需要可以改成info
+    org.flowable.engine.impl.persistence.entity: debug
+    org.flowable.task.service.impl.persistence.entity: debug
+    org.flowable.history.service.impl.persistence.entity: debug
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"

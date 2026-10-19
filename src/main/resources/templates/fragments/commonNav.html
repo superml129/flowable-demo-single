@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%232b5797'/><path d='M20 22h24v6H20zM20 32h16v6H20zM20 42h24v6H20z' fill='white'/></svg>">
+
+</head>
+<body>
+<!-- 定义片段名称：navBar -->
+<div th:fragment="navBar">
+    <h3>Flowable‑6.8.0 通用审批系统</h3>
+    <!--顶部导航栏-->
+    <div class="nav-box">
+        <a th:href="@{/home/index}">🏠首页</a>
+        <a th:href="@{/leaveApply/toPage}">📝提交申请</a>
+        <a th:href="@{/todoTask/toPage(assignee=${session.loginUser})}">✅代办任务查询</a>
+        <a th:href="@{/todoTask/donePage(assignee=${session.loginUser})}">📋已办任务查询</a>
+        <span class="user-text">当前登录用户：<span th:text="${loginUser}"></span></span>
+        <!--退出登录按钮-->
+        <a th:href="@{/login/logout}" style="color:white;margin-left:15px;">🚪退出登录</a>
+    </div>
+</div>
+</body>
+</html>

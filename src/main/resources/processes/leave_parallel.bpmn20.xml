@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd              http://www.omg.org/spec/BPMN/20100524/DI http://www.omg.org/spec/BPMN/2.0/20100501/BPMNDI.xsd              http://www.omg.org/spec/DD/20100524/DC http://www.omg.org/spec/DD/2.0/20100501/DC.xsd              http://www.omg.org/spec/DD/20100524/DI http://www.omg.org/spec/DD/2.0/20100501/DI.xsd" id="Definitions_1" targetNamespace="http://flowable.org/bpmn">
+  <process id="leaveParallelProcess" name="请假_并行网关流程" isExecutable="true">
+    <startEvent id="startEvent1"/>
+    <sequenceFlow id="flow_start" sourceRef="startEvent1" targetRef="pg_out"/>
+    <!-- 流出并行网关：同时开启两条分支 -->
+    <parallelGateway id="pg_out" name="并行分出"/>
+    <!--分支A：财务审批 zhangsan -->
+    <sequenceFlow id="flow_a" sourceRef="pg_out" targetRef="taskFinance"/>
+    <userTask id="taskFinance" name="财务审批" flowable:assignee="zhangsan"/>
+    <sequenceFlow id="flow_a_back" sourceRef="taskFinance" targetRef="pg_in"/>
+    <!--分支B：人事审批 lisi -->
+    <sequenceFlow id="flow_b" sourceRef="pg_out" targetRef="taskHr"/>
+    <userTask id="taskHr" name="人事审批" flowable:assignee="lisi"/>
+    <sequenceFlow id="flow_b_back" sourceRef="taskHr" targetRef="pg_in"/>
+    <!-- 流入并行网关：等待两条分支全部完成，流程继续往下走 -->
+    <parallelGateway id="pg_in" name="并行汇聚"/>
+    <sequenceFlow id="flow_end" sourceRef="pg_in" targetRef="endEvent1"/>
+    <endEvent id="endEvent1"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="leaveParallelProcess">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="startEvent1">
+        <dc:Bounds x="80" y="130" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="pgOutShape" bpmnElement="pg_out">
+        <dc:Bounds x="180" y="115" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="taskFinanceShape" bpmnElement="taskFinance">
+        <dc:Bounds x="320" y="40" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="taskHrShape" bpmnElement="taskHr">
+        <dc:Bounds x="320" y="190" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="pgInShape" bpmnElement="pg_in">
+        <dc:Bounds x="500" y="115" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endShape" bpmnElement="endEvent1">
+        <dc:Bounds x="620.0" y="122.0" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_flow_start" bpmnElement="flow_start">
+        <di:waypoint x="116.0" y="148.0"/>
+        <di:waypoint x="180" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_a" bpmnElement="flow_a">
+        <di:waypoint x="205" y="115"/>
+        <di:waypoint x="320" y="80"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_b" bpmnElement="flow_b">
+        <di:waypoint x="205" y="165"/>
+        <di:waypoint x="320" y="230"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_a_back" bpmnElement="flow_a_back">
+        <di:waypoint x="420" y="80"/>
+        <di:waypoint x="500" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_b_back" bpmnElement="flow_b_back">
+        <di:waypoint x="420" y="230"/>
+        <di:waypoint x="500" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_end" bpmnElement="flow_end">
+        <di:waypoint x="550" y="140"/>
+        <di:waypoint x="620.0" y="140.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
