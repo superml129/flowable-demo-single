@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<!-- 公共分页片段 -->
+<!-- 公共分页片段 异步-->
 <div th:fragment="pagination(total,pageNum,pageSize,totalPages,url,sortField,sortOrder)">
   <div class="page-box">
     <span>共<span th:text="${total}"></span>条，第<span th:text="${pageNum}"></span>/<span th:text="${totalPages}"></span>页</span>
 
     <!-- 每页条数下拉 -->
     <select id="pageSizeSelect" style="padding:5px;border:1px solid #ccc;border-radius:4px;">
+      <option value="5" th:selected="${pageSize ==5}">5条/页</option>
       <option value="10" th:selected="${pageSize ==10}">10条/页</option>
       <option value="20" th:selected="${pageSize ==20}">20条/页</option>
       <option value="50" th:selected="${pageSize ==50}">50条/页</option>
@@ -14,20 +15,55 @@
       <option value="500" th:selected="${pageSize ==500}">500条/页</option>
     </select>
 
-    <a th:href="@{${url}(pageNum=1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">首页</a>
-    <a th:if="${pageNum > 1}" th:href="@{${url}(pageNum=${pageNum}-1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">上一页</a>
-    <a th:if="${pageNum < totalPages}" th:href="@{${url}(pageNum=${pageNum}+1,pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">下一页</a>
-    <a th:href="@{${url}(pageNum=${totalPages},pageSize=${pageSize},sortField=${sortField},sortOrder=${sortOrder})}">末页</a>
+    <button class="page-btn" data-page="1">首页</button>
+    <button th:if="${pageNum > 1}" class="page-btn" th:data-page="${pageNum - 1}">上一页</button>
+    <button th:if="${pageNum < totalPages}" class="page-btn" th:data-page="${pageNum + 1}">下一页</button>
+    <button class="page-btn" th:data-page="${totalPages}">末页</button>
   </div>
 
   <script th:inline="javascript">
     /*<![CDATA[*/
-    document.getElementById("pageSizeSelect").onchange = function(){
-      const size = this.value;
-      const targetUrl = /*[[${url}]]*/ '';
-      const sField = /*[[${sortField}]]*/ '';
-      const sOrder = /*[[${sortOrder}]]*/ '';
-      window.location.href = targetUrl + "?pageNum=1&pageSize="+size+"&sortField="+sField+"&sortOrder="+sOrder;
+    const pagerUrl = /*[[${url}]]*/ '';
+    const pagerSortField = /*[[${sortField}]]*/ '';
+    const pagerSortOrder = /*[[${sortOrder}]]*/ '';
+
+    function pagerGo(targetPage){
+      // 注意：这里必须用 id 选择器（select 只有 id，没有 class）
+      const size = document.getElementById('pageSizeSelect')?.value || 10;
+      const assignee = document.querySelector('.search-form-inner input[name="assignee"]')?.value ?? '';
+
+      // 异步页面（todoTaskTable）里隐藏域保存着最新排序状态，优先读取，避免用页面初始值
+      const hiddenSortField = document.querySelector('.search-form-inner input[name="sortField"]')?.value;
+      const hiddenSortOrder = document.querySelector('.search-form-inner input[name="sortOrder"]')?.value;
+      const sf = hiddenSortField ?? pagerSortField;
+      const so = hiddenSortOrder ?? pagerSortOrder;
+
+      if (typeof reloadTable === 'function') {
+        // 异步页面：局部刷新表格
+        reloadTable(targetPage, size, sf, so, assignee);
+      } else {
+        // 同步页面（首页/已办列表）：整页跳转
+        let href = pagerUrl + '?pageNum=' + targetPage + '&pageSize=' + size;
+        if (sf) href += '&sortField=' + encodeURIComponent(sf);
+        if (so) href += '&sortOrder=' + encodeURIComponent(so);
+        if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
+        window.location.href = href;
+      }
+    }
+
+    // 事件委托绑到 document 上：片段被 innerHTML 替换后监听器依然有效，新 DOM 自动生效
+    if (!window.__pagerDelegated) {
+      window.__pagerDelegated = true; // 防止重复绑定
+      document.addEventListener('click', function(e){
+        const btn = e.target.closest('.page-btn');
+        if(!btn) return;
+        pagerGo(btn.dataset.page);
+      });
+      document.addEventListener('change', function(e){
+        if(e.target && e.target.id === 'pageSizeSelect'){
+          pagerGo(1); // 切换每页条数，回到第1页
+        }
+      });
     }
     /*]]>*/
   </script>

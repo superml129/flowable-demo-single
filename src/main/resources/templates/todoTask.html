@@ -10,99 +10,38 @@
 <div th:replace="~{fragments/commonNav :: navBar}"></div>
 <div style="width:95%;margin:20px auto;">
     <h3>工作流‑代办任务查询</h3>
-    <div class="search-form">
-        <form th:action="@{/todoTask/toPage}" method="get">
-            <span class="label-text">查询办理人：</span>
-            <input type="text" name="assignee" th:value="${searchUser}" placeholder="请输入办理人账号"/>
-            <input type="hidden" name="pageNum" value="1"/>
-            <input type="hidden" name="pageSize" th:value="${pageSize}"/>
-            <input type="hidden" name="sortField" th:value="${sortField}"/>
-            <input type="hidden" name="sortOrder" th:value="${sortOrder}"/>
-            <button type="submit">搜索</button>
-        </form>
+    <!-- 表格刷新容器 -->
+    <div id="tableWrap">
+        <div th:replace="~{fragments/todoTaskTable :: todoTaskTable}"></div>
     </div>
-
-    <table>
-        <thead>
-        <tr>
-            <th>任务ID</th>
-            <th>
-                <a th:href="@{/todoTask/toPage(
-                    sortField='taskName',
-                    sortOrder=${sortField == 'taskName' and sortOrder=='asc' ? 'desc' : 'asc'},
-                    pageNum=${pageNum},
-                    pageSize=${pageSize}
-            )}">
-                    任务名称
-                    <span th:if="${sortField == 'taskName'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
-                </a>
-            </th>
-            <th>流程实例ID</th>
-            <th>
-                <a th:href="@{/todoTask/toPage(
-                    sortField='assignee',
-                    sortOrder=${sortField == 'assignee' and sortOrder=='asc' ? 'desc' : 'asc'},
-                    pageNum=${pageNum},
-                    pageSize=${pageSize}
-            )}">
-                    办理人
-                    <span th:if="${sortField == 'assignee'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
-                </a>
-            </th>
-            <th>
-                <a th:href="@{/todoTask/toPage(
-                    sortField='createTime',
-                    sortOrder=${sortField == 'createTime' and sortOrder=='asc' ? 'desc' : 'asc'},
-                    pageNum=${pageNum},
-                    pageSize=${pageSize}
-                )}">
-                    创建时间
-                    <span th:if="${sortField == 'createTime'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
-                </a>
-            </th>
-            <th>操作</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="item : ${todoList}">
-            <td th:text="${item.taskId}"></td>
-            <td th:text="${item.taskName}"></td>
-            <td th:text="${item.processInstanceId}"></td>
-            <td th:text="${item.assignee}"></td>
-            <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
-            <td>
-                <button class="completeBtn" th:data-task-id="${item.taskId}">完成任务</button>
-            </td>
-        </tr>
-        </tbody>
-    </table>
 </div>
-<div th:replace="~{fragments/pagination :: pagination(
-    ${total},
-    ${pageNum},
-    ${pageSize},
-    ${totalPages},
-    '/todoTask/toPage',
-    ${sortField},
-    ${sortOrder}
-)}"></div>
 
-<script>
-    window.onload = function(){
-        let btnList = document.querySelectorAll(".completeBtn");
-        for(let btn of btnList){
-            btn.onclick = function (){
-                let taskId = this.dataset.taskId;
-                if(!confirm("确认完成该代办任务？")) return;
-                fetch("/task/complete?taskId="+taskId,{method:"POST"})
-                    .then(resp=>resp.text())
-                    .then(res=>{
-                        alert(res);
-                        window.location.reload();
-                    })
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    // 全局刷新表格函数，给分页组件调用
+    function reloadTable(pageNum, pageSize, sortField, sortOrder, assignee){
+        let params = new URLSearchParams();
+        params.append('pageNum', pageNum);
+        params.append('pageSize', pageSize);
+        if(sortField) params.append('sortField', sortField);
+        if(sortOrder) params.append('sortOrder', sortOrder);
+        if(assignee !== undefined) params.append('assignee', assignee);
+
+        fetch('/todoTask/toPage?' + params.toString(), {
+            headers: {
+                'X-Requested-With':'XMLHttpRequest'
             }
-        }
+        })
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('tableWrap').innerHTML = html;
+            })
+            .catch(err=>{
+                console.error(err);
+                alert('加载失败');
+            })
     }
+    /*]]>*/
 </script>
 </body>
 </html>

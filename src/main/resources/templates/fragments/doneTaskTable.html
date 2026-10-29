@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<div th:fragment="doneTaskTable">
+    <!-- 已办任务表格片段（异步局部刷新） -->
+    <div class="search-form">
+        <form class="search-form-inner">
+            <span class="label-text">查询办理人：</span>
+            <input type="text" name="assignee" th:value="${searchUser}" placeholder="请输入办理人账号"/>
+            <input type="hidden" name="pageNum" th:value="${pageNum}"/>
+            <input type="hidden" name="pageSize" th:value="${pageSize}"/>
+            <input type="hidden" name="sortField" th:value="${sortField}"/>
+            <input type="hidden" name="sortOrder" th:value="${sortOrder}"/>
+            <button type="submit">搜索</button>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+        <tr>
+            <th>任务ID</th>
+            <th>
+                <a class="sort-link" data-field="taskName">
+                    任务名称
+                    <span th:if="${sortField == 'taskName'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
+                </a>
+            </th>
+            <th>流程实例ID</th>
+            <th>
+                <a class="sort-link" data-field="assignee">
+                    办理人
+                    <span th:if="${sortField == 'assignee'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
+                </a>
+            </th>
+            <th>
+                <a class="sort-link" data-field="createTime">
+                    创建时间
+                    <span th:if="${sortField == 'createTime'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
+                </a>
+            </th>
+            <th>
+                <a class="sort-link" data-field="endTime">
+                    结束时间
+                    <span th:if="${sortField == 'endTime'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
+                </a>
+            </th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="item : ${doneList}">
+            <td th:text="${item.taskId}"></td>
+            <td th:text="${item.taskName}"></td>
+            <td th:text="${item.processInstanceId}"></td>
+            <td th:text="${item.assignee}"></td>
+            <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
+            <td th:text="${#dates.format(item.endTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div th:replace="~{fragments/pagination :: pagination(
+        ${total},
+        ${pageNum},
+        ${pageSize},
+        ${totalPages},
+        '/todoTask/donePage',
+        ${sortField},
+        ${sortOrder}
+    )}"></div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        // 片段内脚本：排序、搜索
+        // 关键点：通过 fetch + innerHTML 局部刷新时，片段内的 <script> 不会被执行，
+        // 所以不能把监听器绑在片段内的元素上（刷新后就失效了）。
+        // 这里统一用事件委托绑到 document 上，绑定一次，异步刷新后新 DOM 自动生效。
+        // 当前分页/排序状态全部从片段里的隐藏域实时读取，不依赖页面初始值。
+
+        function getSearchAssignee() {
+            const input = document.querySelector('.search-form-inner input[name="assignee"]');
+            return input?.value ?? '';
+        }
+        function tableCurrentSize() {
+            return document.querySelector('.search-form-inner input[name="pageSize"]')?.value || 10;
+        }
+        function tableCurrentPage() {
+            return document.querySelector('.search-form-inner input[name="pageNum"]')?.value || 1;
+        }
+        function tableCurrentSortField() {
+            return document.querySelector('.search-form-inner input[name="sortField"]')?.value || '';
+        }
+        function tableCurrentSortOrder() {
+            return document.querySelector('.search-form-inner input[name="sortOrder"]')?.value || '';
+        }
+
+        if (!window.__taskTableDelegated) {
+            window.__taskTableDelegated = true; // 防止重复绑定
+
+            document.addEventListener('click', function (e) {
+                // 排序点击
+                const sortLink = e.target.closest('.sort-link');
+                if (sortLink) {
+                    e.preventDefault();
+                    let field = sortLink.dataset.field;
+                    let curField = tableCurrentSortField();
+                    let curOrder = tableCurrentSortOrder();
+                    let newOrder = (field === curField && curOrder === 'asc') ? 'desc' : 'asc';
+                    reloadTable(1, tableCurrentSize(), field, newOrder, getSearchAssignee());
+                    return;
+                }
+
+            })
+
+            // 搜索表单
+            document.addEventListener('submit', function (e) {
+                if (e.target && e.target.matches('.search-form-inner')) {
+                    e.preventDefault();
+                    reloadTable(1, tableCurrentSize(), '', '', getSearchAssignee());
+                }
+            })
+        }
+        /*]]>*/
+    </script>
+</div>
+</html>

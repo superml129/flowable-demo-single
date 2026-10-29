@@ -18,6 +18,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ public class PageController {
     @GetMapping("/toPage")
     public ModelAndView todoTaskList(Model model,
                                      HttpSession session,
+                                     HttpServletRequest request,
                                      @RequestParam(required = false) String assignee,
                                      @RequestParam(defaultValue = "1") Integer pageNum,
                                      @RequestParam(defaultValue = "10") Integer pageSize,
@@ -116,12 +118,22 @@ public class PageController {
         model.addAttribute("searchUser", assignee);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
-        return new ModelAndView("todoTask");
+
+        // 核心判断：异步AJAX返回表格片段
+        String ajaxHeader = request.getHeader("X-Requested-With");
+        ModelAndView mv;
+        if ("XMLHttpRequest".equals(ajaxHeader)) {
+            mv = new ModelAndView("fragments/todoTaskTable");
+        } else {
+            mv = new ModelAndView("todoTask");
+        }
+        return mv;
     }
 
     @GetMapping("/donePage")
     public ModelAndView doneTaskList(Model model,
                                      HttpSession session,
+                                     HttpServletRequest request,
                                      @RequestParam(required = false) String assignee,
                                      @RequestParam(defaultValue = "1") Integer pageNum,
                                      @RequestParam(defaultValue = "10") Integer pageSize,
@@ -204,7 +216,15 @@ public class PageController {
         model.addAttribute("searchUser", assignee);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
-        return new ModelAndView("doneTask");
+
+        String ajaxHeader = request.getHeader("X-Requested-With");
+        ModelAndView mv;
+        if ("XMLHttpRequest".equals(ajaxHeader)) {
+            mv = new ModelAndView("fragments/doneTaskTable");
+        } else {
+            mv = new ModelAndView("doneTask");
+        }
+        return mv;
     }
 
     //=======新增：任务办理表单页面=======

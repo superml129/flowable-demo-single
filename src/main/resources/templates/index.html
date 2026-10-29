@@ -120,11 +120,7 @@
         document.body.style.userSelect = '';
     });
 
-    <!-- JS：切换下拉，自动刷新页面，保留pageSize，回到第1页 -->
-    document.getElementById("pageSizeSelect").onchange = function () {
-        const size = this.value;
-        window.location.href = "/home/index?pageNum=1&pageSize=" + size;
-    }
+    // 切换每页条数的逻辑已统一在 fragments/pagination.html 中处理（document 级事件委托）
 </script>
 
 </body>
