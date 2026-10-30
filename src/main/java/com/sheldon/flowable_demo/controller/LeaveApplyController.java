@@ -23,13 +23,13 @@ public class LeaveApplyController {
     @Resource
     private TaskService taskService;
 
-    // 跳转到提交请假表单页面
+    // 跳转到提交表单页面
     @RequestMapping("/toPage")
     public String toApplyPage(){
         return "leaveApply";
     }
 
-    // 提交表单，启动请假流程
+    // 提交表单，启动流程
     @PostMapping("/submit")
     public String submitLeave(@RequestParam String applyUser,
                               @RequestParam Integer leaveDays,

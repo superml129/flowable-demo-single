@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>流程模板预览</title>
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@11.5.0/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@11.5.0/dist/assets/bpmn-font/css/bpmn.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        .toolbar{height:48px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
+        .toolbar a{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-size:14px;color:#fff;text-decoration:none;}
+        .toolbar a:hover{color:#ffd166;transition:color 0.2s;}
+        .container{height:calc(100vh - 48px);}
+        #canvas{width:100%;height:100%;}
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <a th:href="@{/flowDef/listPage}">← 返回列表</a>
+</div>
+<div class="container">
+    <div id="canvas"></div>
+</div>
+
+<script src="https://unpkg.com/bpmn-js@11.5.0/dist/bpmn-viewer.development.js"></script>
+<script th:inline="javascript">
+    const processDefinitionId = /*[[${processDefinitionId}]]*/ '';
+    const viewer = new BpmnJS({container: "#canvas"});
+
+    async function loadDiagram(){
+        const res = await fetch(`/flowDef/getDefXml?processDefinitionId=${processDefinitionId}`);
+        const xml = await res.text();
+        await viewer.importXML(xml);
+        viewer.get('canvas').zoom('fit-viewport');
+    }
+    loadDiagram();
+</script>
+</body>
+</html>

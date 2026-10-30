@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>流程定义列表</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        .toolbar{height:48px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
+        .toolbar a{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-size:14px;color:#fff;text-decoration:none;}
+        .toolbar a:hover{color:#ffd166;transition:color 0.2s;}
+        .container{width:96%;margin:20px auto;}
+        h3{margin-bottom:16px;color:#2c3e50;}
+        table{
+            width:100%;
+            border-collapse:collapse;
+            background:#fff;
+            box-shadow:0 1px 12px rgba(0,0,0,0.08);
+            border-radius:8px;
+            overflow:hidden;
+            table-layout: fixed; /* 固定列宽，不会被长文本撑变形 */
+        }
+        th,td{
+            padding:14px 12px;
+            text-align:left;
+            border-bottom:1px solid #eee;
+            white-space: nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis; /* 超出显示省略号 */
+        }
+        /* 分配每一列宽度 */
+        th:nth-child(1){width:14%;}
+        th:nth-child(2){width:14%;}
+        th:nth-child(3){width:8%;}
+        th:nth-child(4){width:24%;}
+        th:nth-child(5){width:28%;}
+        th:nth-child(6){width:12%;}
+
+        th{background:#2c3e50;color:#fff;font-weight:normal;}
+        tr:hover{background:#f3f6fa;}
+        .btn{padding:4px 10px;border-radius:4px;text-decoration:none;font-size:13px;}
+        .btn-view{background:#3490dc;color:#fff;}
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <a th:href="@{/home/index}">🏠主页</a>
+</div>
+<div class="container">
+    <h3>📋 已定义流程列表</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>流程名称</th>
+            <th>流程Key</th>
+            <th>版本</th>
+            <th>定义ID</th>
+            <th>资源文件</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody">
+        <tr><td colspan="6">加载中...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const tableBody = document.getElementById("tableBody");
+    async function loadDefList(){
+        const res = await fetch("/flowDef/list");
+        const list = await res.json();
+        if(list.length === 0){
+            tableBody.innerHTML = "<tr><td colspan='6'>暂无流程定义</td></tr>";
+            return;
+        }
+        let html = "";
+        list.forEach(item=>{
+            html += `
+            <tr>
+                <td title="${item.name || '-'}">${item.name || '-'}</td>
+                <td title="${item.key}">${item.key}</td>
+                <td>V${item.version}</td>
+                <td title="${item.id}">${item.id}</td>
+                <td title="${item.resourceName}">${item.resourceName}</td>
+                <td>
+                    <a class="btn btn-view" target="_blank" href="/flowDef/view?processDefinitionId=${item.id}">查看流程图</a>
+                </td>
+            </tr>
+            `
+        })
+        tableBody.innerHTML = html;
+    }
+    loadDefList();
+</script>
+</body>
+</html>
