@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>流程设计器</title>
+    <!-- bpmn-js css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/assets/bpmn-font/css/bpmn.css">
+    <style>
+        * {margin:0;padding:0;box-sizing:border-box;}
+        .container{height:100vh;display:flex;flex-direction:column;}
+        .toolbar{height:50px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
+        .toolbar button{padding:6px 12px;cursor:pointer;border:none;border-radius:4px;}
+        #canvas{flex:1;}
+
+        /* 弹窗样式 */
+        .modal{
+            display:none;
+            position:fixed;
+            top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.5);
+            z-index:999;
+            align-items:center;
+            justify-content:center;
+        }
+        .modal-content{
+            background:#fff;
+            padding:20px;
+            border-radius:8px;
+            width:400px;
+        }
+        .modal-content select{
+            width:100%;
+            padding:6px;
+            margin:12px 0;
+        }
+        .modal-btn-group{
+            display:flex;gap:10px;justify-content:flex-end;margin-top:10px;
+        }
+        .toolbar a{
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="toolbar">
+        <a th:href="@{/home/index}">
+            <button>🏠 主页</button>
+        </a>
+        <button id="btnImport">导入XML</button>
+        <button id="btnLoadDeploy">加载已有流程</button>
+        <button id="btnGetXml">获取BPMN XML</button>
+        <button id="btnDeploy">部署到Flowable</button>
+        <input type="file" id="fileInput" accept=".xml,.bpmn" style="display:none">
+    </div>
+    <div id="canvas"></div>
+</div>
+
+<!-- 选择部署弹窗 -->
+<div class="modal" id="deployModal">
+    <div class="modal-content">
+        <div>选择已部署流程：</div>
+        <select id="deploySelect">
+        </select>
+        <div class="modal-btn-group">
+            <button id="modalConfirm">确定加载</button>
+            <button id="modalClose">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- bpmn-js -->
+<script src="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/bpmn-modeler.development.js"></script>
+<script>
+    const bpmnModeler = new BpmnJS({
+        container: '#canvas'
+    });
+
+    // 空白模板
+    async function createNewDiagram() {
+        const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100501/BPMN20"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100501/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100501/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100501/DI"
+  id="Definitions_1"
+  targetNamespace="http://flowable.org/bpmn">
+  <bpmn:process id="Process_1" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="173" y="102" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+        await bpmnModeler.importXML(emptyXml);
+    }
+    createNewDiagram();
+
+    // 导入本地文件
+    document.getElementById('btnImport').onclick = ()=>{
+        document.getElementById('fileInput').click();
+    };
+    document.getElementById('fileInput').onchange = async (e)=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = async (ev)=>{
+            try{
+                await bpmnModeler.importXML(ev.target.result);
+                alert("导入成功");
+            }catch(err){
+                console.error(err);
+                alert("导入失败，不是合法BPMN");
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    // 获取xml并下载
+    document.getElementById('btnGetXml').onclick = async ()=>{
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        console.log(xml);
+        const blob = new Blob([xml], {type:"text/xml"});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = "model.bpmn20.xml";
+        a.click();
+    };
+
+    // 部署提交
+    document.getElementById('btnDeploy').onclick = async ()=>{
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        const processName = prompt("输入流程名称");
+        if(!processName) return;
+        fetch("/flow/deploy",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                name: processName,
+                bpmnXml: xml
+            })
+        }).then(res=>res.text())
+            .then(ret=>{
+                alert(ret);
+            })
+    };
+
+    // ========== 【新增：加载已有流程逻辑】 ==========
+    const modal = document.getElementById('deployModal');
+    const deploySelect = document.getElementById('deploySelect');
+
+    // 打开弹窗，拉取部署列表
+    document.getElementById('btnLoadDeploy').onclick = async ()=>{
+        const res = await fetch("/flow/listDeploy");
+        const list = await res.json();
+        deploySelect.innerHTML = "";
+        if(list.length === 0){
+            alert("暂无已部署流程");
+            return;
+        }
+        list.forEach(item=>{
+            const opt = document.createElement("option");
+            opt.value = item.deploymentId;
+            opt.innerText = item.name + " ("+item.deployTime+")";
+            deploySelect.appendChild(opt);
+        })
+        modal.style.display = "flex";
+    };
+
+    // 确认加载
+    document.getElementById('modalConfirm').onclick = async ()=>{
+        const deploymentId = deploySelect.value;
+        const xmlRes = await fetch("/flow/getXml?deploymentId="+deploymentId);
+        const xml = await xmlRes.text();
+        if(!xml){
+            alert("该部署下没有找到bpmn文件");
+            modal.style.display = "none";
+            return;
+        }
+        try{
+            await bpmnModeler.importXML(xml);
+            alert("加载成功！");
+        }catch(e){
+            console.error(e);
+            alert("xml解析失败");
+        }
+        modal.style.display = "none";
+    };
+
+    // 关闭弹窗
+    document.getElementById('modalClose').onclick = ()=>{
+        modal.style.display = "none";
+    }
+</script>
+</body>
+</html>

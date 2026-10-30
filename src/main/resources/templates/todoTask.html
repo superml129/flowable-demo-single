@@ -12,7 +12,12 @@
     <h3>工作流‑代办任务查询</h3>
     <!-- 表格刷新容器 -->
     <div id="tableWrap">
-        <div th:replace="~{fragments/todoTaskTable :: todoTaskTable}"></div>
+        <div th:replace="~{fragments/todoTaskTable :: todoTaskTable(
+            ${todoList},
+            ${total},
+            '/todoTask/toPage',
+            true
+        )}"></div>
     </div>
 </div>
 

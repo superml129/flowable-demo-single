@@ -43,6 +43,7 @@
                     <span th:if="${sortField == 'endTime'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
                 </a>
             </th>
+            <th>操作</th>
         </tr>
         </thead>
         <tbody>
@@ -53,6 +54,11 @@
             <td th:text="${item.assignee}"></td>
             <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
             <td th:text="${#dates.format(item.endTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
+            <td>
+                <a th:href="@{/flowDiagram/view(processInstanceId=${item.processInstanceId})}" target="_blank">
+                    <button>查看流程图</button>
+                </a>
+            </td>
         </tr>
         </tbody>
     </table>

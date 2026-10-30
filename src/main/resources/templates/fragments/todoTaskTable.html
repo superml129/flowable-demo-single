@@ -1,8 +1,32 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<div th:fragment="todoTaskTable">
-    <!-- 代办任务表格片段（异步局部刷新） -->
-    <div class="search-form">
+<!--
+  代办任务表格片段（可复用）
+  参数：
+    dataList   - 表格数据列表（如 ${todoList} / ${homeTodoList}）
+    totalCount - 数据总条数（如 ${total} / ${todoTotal}）
+    pageUrl    - 分页/排序请求地址（如 '/todoTask/toPage' / '/home/index'）
+    showAdmin  - 是否显示搜索表单和"办理人"列（代办查询页 true，首页 false）
+  兼容：PageController AJAX 局部刷新会不带参数直接渲染本片段，
+  此时用 th:with 回退到旧的模型变量（todoList/total 等），保证两条渲染路径都可用。
+-->
+<div th:fragment="todoTaskTable(dataList, totalCount, pageUrl, showAdmin)"
+     th:with="dList=${dataList ?: todoList},
+              tCount=${totalCount ?: total},
+              pUrl=${pageUrl ?: '/todoTask/toPage'},
+              sAdmin=${showAdmin != null ? showAdmin : true}">
+
+    <!-- 表格状态隐藏域：始终渲染，保存分页/排序最新状态，供 JS 和异步刷新读取 -->
+    <div class="table-state" hidden="hidden">
+        <input type="hidden" name="pageNum" th:value="${pageNum}"/>
+        <input type="hidden" name="pageSize" th:value="${pageSize}"/>
+        <input type="hidden" name="sortField" th:value="${sortField}"/>
+        <input type="hidden" name="sortOrder" th:value="${sortOrder}"/>
+        <input type="hidden" name="pageUrl" th:value="${pUrl}"/>
+    </div>
+
+    <!-- 搜索表单：仅代办任务查询页显示 -->
+    <div class="search-form" th:if="${sAdmin}">
         <form class="search-form-inner">
             <span class="label-text">查询办理人：</span>
             <input type="text" name="assignee" th:value="${searchUser}" placeholder="请输入办理人账号"/>
@@ -19,20 +43,20 @@
         <tr>
             <th>任务ID</th>
             <th>
-                <a class="sort-link" data-field="taskName">
+                <a class="sort-link" data-field="taskName" href="javascript:void(0)">
                     任务名称
                     <span th:if="${sortField == 'taskName'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
                 </a>
             </th>
             <th>流程实例ID</th>
-            <th>
-                <a class="sort-link" data-field="assignee">
+            <th th:if="${sAdmin}">
+                <a class="sort-link" data-field="assignee" href="javascript:void(0)">
                     办理人
                     <span th:if="${sortField == 'assignee'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
                 </a>
             </th>
             <th>
-                <a class="sort-link" data-field="createTime">
+                <a class="sort-link" data-field="createTime" href="javascript:void(0)">
                     创建时间
                     <span th:if="${sortField == 'createTime'}">[[${sortOrder == 'asc' ? '↑' : '↓'}]]</span>
                 </a>
@@ -41,25 +65,32 @@
         </tr>
         </thead>
         <tbody>
-        <tr th:each="item : ${todoList}">
+        <tr th:each="item : ${dList}">
             <td th:text="${item.taskId}"></td>
             <td th:text="${item.taskName}"></td>
             <td th:text="${item.processInstanceId}"></td>
-            <td th:text="${item.assignee}"></td>
+            <td th:if="${sAdmin}" th:text="${item.assignee}"></td>
             <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
             <td>
+                <a class="btn-edit" th:href="@{/todoTask/toAudit(taskId=${item.taskId})}">办理</a>
                 <button class="completeBtn" th:data-task-id="${item.taskId}">完成任务</button>
+                <a th:href="@{/flowDiagram/view(processInstanceId=${item.processInstanceId})}" target="_blank" style="margin-left:8px;">
+                    <button>查看流程图</button>
+                </a>
             </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(dList)}">
+            <td th:colspan="${sAdmin} ? 6 : 5" style="text-align:center;">暂无代办任务</td>
         </tr>
         </tbody>
     </table>
 
     <div th:replace="~{fragments/pagination :: pagination(
-        ${total},
+        ${tCount},
         ${pageNum},
         ${pageSize},
         ${totalPages},
-        '/todoTask/toPage',
+        ${pUrl},
         ${sortField},
         ${sortOrder}
     )}"></div>
@@ -70,23 +101,43 @@
         // 关键点：通过 fetch + innerHTML 局部刷新时，片段内的 <script> 不会被执行，
         // 所以不能把监听器绑在片段内的元素上（刷新后就失效了）。
         // 这里统一用事件委托绑到 document 上，绑定一次，异步刷新后新 DOM 自动生效。
-        // 当前分页/排序状态全部从片段里的隐藏域实时读取，不依赖页面初始值。
+        // 当前分页/排序状态全部从片段里的状态隐藏域（.table-state）实时读取，不依赖页面初始值。
 
+        function tableState(name) {
+            const input = document.querySelector('.table-state input[name="' + name + '"]');
+            return input?.value ?? '';
+        }
         function getSearchAssignee() {
             const input = document.querySelector('.search-form-inner input[name="assignee"]');
             return input?.value ?? '';
         }
         function tableCurrentSize() {
-            return document.querySelector('.search-form-inner input[name="pageSize"]')?.value || 10;
+            return tableState('pageSize') || 10;
         }
         function tableCurrentPage() {
-            return document.querySelector('.search-form-inner input[name="pageNum"]')?.value || 1;
+            return tableState('pageNum') || 1;
         }
         function tableCurrentSortField() {
-            return document.querySelector('.search-form-inner input[name="sortField"]')?.value || '';
+            return tableState('sortField');
         }
         function tableCurrentSortOrder() {
-            return document.querySelector('.search-form-inner input[name="sortOrder"]')?.value || '';
+            return tableState('sortOrder');
+        }
+        function tablePageUrl() {
+            return tableState('pageUrl');
+        }
+
+        // 同步页面的兜底刷新：整页跳转到 pageUrl。
+        // 异步页面（todoTask.html）会在自己的 <script> 里重新定义 fetch 版 reloadTable，
+        // 页面脚本后执行，会把这里的兜底实现覆盖掉，互不影响。
+        if (typeof window.reloadTable !== 'function') {
+            window.reloadTable = function (pageNum, pageSize, sortField, sortOrder, assignee) {
+                let href = tablePageUrl() + '?pageNum=' + pageNum + '&pageSize=' + pageSize;
+                if (sortField) href += '&sortField=' + encodeURIComponent(sortField);
+                if (sortOrder) href += '&sortOrder=' + encodeURIComponent(sortOrder);
+                if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
+                window.location.href = href;
+            };
         }
 
         if (!window.__taskTableDelegated) {

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>流程实例查看（高亮）</title>
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@11.5.0/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@11.5.0/dist/assets/bpmn-font/css/bpmn.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        .toolbar{height:48px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
+        .toolbar a, .toolbar button{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-size:14px}
+        .container{height:calc(100vh - 48px);}
+        #canvas{width:100%;height:100%;}
+        .legend{color:#fff;margin-left:20px;display:flex;gap:16px;}
+        .legend span{display:flex;align-items:center;gap:4px}
+        .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+        .dot-finish{background:#38c172;}
+        .dot-active{background:#f59e0b;}
+
+        /* 新增：图例和主页链接hover高亮 */
+        .legend span:hover,
+        .legend a:hover{
+            color: #ffd166;
+            transition: color 0.2s;
+        }
+        .legend a{
+            color:#fff;
+            text-decoration: none;
+        }
+
+        /* ========== 高亮样式 ========== */
+        /* 已完成节点 */
+        .djs-element.highlight-finished .djs-visual > rect,
+        .djs-element.highlight-finished .djs-visual > circle {
+            fill: #e6f9ef !important;
+            stroke: #22c55e !important;
+            stroke-width: 3px !important;
+        }
+        /* 走过的连线 */
+        .djs-connection.highlight-flow path {
+            stroke: #22c55e !important;
+            stroke-width:3px !important;
+        }
+        /* 当前待办节点 + 闪烁动画 */
+        @keyframes blinkActive {
+            0% { stroke: #f59e0b; stroke-width:3px; }
+            50% { stroke: #ff6b00; stroke-width:4px; }
+            100% { stroke: #f59e0b; stroke-width:3px; }
+        }
+        .djs-element.highlight-active .djs-visual > rect,
+        .djs-element.highlight-active .djs-visual > circle {
+            fill: #fffbeb !important;
+            animation: blinkActive 0.8s infinite;
+        }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <div class="legend">
+        <a th:href="@{/home/index}">🏠主页</a>
+        <span><span class="dot dot-finish"></span>已完成</span>
+        <span><span class="dot dot-active"></span>当前待处理</span>
+        <span><span class="dot" style="background:#aaa"></span>未执行</span>
+    </div>
+</div>
+<div class="container">
+    <div id="canvas"></div>
+</div>
+
+<script src="https://unpkg.com/bpmn-js@11.5.0/dist/bpmn-viewer.development.js"></script>
+<script>
+    const urlParams = new URLSearchParams(location.search);
+    const processInstanceId = urlParams.get("processInstanceId");
+    if(!processInstanceId){
+        alert("缺少流程实例ID");
+    }
+
+    const viewer = new BpmnJS({
+        container: "#canvas"
+    });
+
+    function highlightNodes(finishedNodeIds, activeNodeIds, flowIds) {
+        const canvas = viewer.get('canvas');
+        // 清除旧标记
+        canvas.removeMarker(canvas.getRootElement(), 'highlight-finished');
+        canvas.removeMarker(canvas.getRootElement(), 'highlight-active');
+        canvas.removeMarker(canvas.getRootElement(), 'highlight-flow');
+
+        // 已完成节点
+        finishedNodeIds.forEach(id => canvas.addMarker(id, 'highlight-finished'));
+        // 当前节点
+        activeNodeIds.forEach(id => canvas.addMarker(id, 'highlight-active'));
+        // 走过的连线
+        flowIds.forEach(id => canvas.addMarker(id, 'highlight-flow'));
+    }
+
+    async function loadDiagram(){
+        const res = await fetch(`/flowDiagram/getInstanceInfo?processInstanceId=${processInstanceId}`);
+        const data = await res.json();
+        if(!data.bpmnXml){
+            alert("获取流程xml失败");
+            return;
+        }
+        await viewer.importXML(data.bpmnXml);
+        // 后端返回三个数组：已完成节点、当前节点、走过的连线ID
+        highlightNodes(data.finishedNodeIds, data.activeNodeIds, data.flowIds || []);
+        viewer.get('canvas').zoom('fit-viewport');
+    }
+    loadDiagram();
+</script>
+</body>
+</html>
