@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title>流程设计器</title>
-    <!-- bpmn-js css -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/assets/diagram-js.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/assets/bpmn-font/css/bpmn.css">
+    <!-- bpmn-js css（本地化，避免 CDN 不可达导致白屏） -->
+    <link rel="stylesheet" th:href="@{/vendor/bpmn-js/diagram-js.css}">
+    <link rel="stylesheet" th:href="@{/vendor/bpmn-js/bpmn-font/css/bpmn.css}">
+    <!-- 属性面板样式 -->
+    <link rel="stylesheet" th:href="@{/vendor/properties-panel/properties-panel.css}">
     <style>
         * {margin:0;padding:0;box-sizing:border-box;}
         .container{height:100vh;display:flex;flex-direction:column;}
         .toolbar{height:50px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
         .toolbar button{padding:6px 12px;cursor:pointer;border:none;border-radius:4px;}
+        /* 主体：画布 + 属性面板并排 */
+        .main-wrap{flex:1;display:flex;}
         #canvas{flex:1;}
+        #properties-panel{width:340px;border-left:1px solid #ddd;overflow:auto;}
 
         /* 弹窗样式 */
         .modal{
@@ -54,7 +59,11 @@
         <button id="btnDeploy">部署到Flowable</button>
         <input type="file" id="fileInput" accept=".xml,.bpmn" style="display:none">
     </div>
-    <div id="canvas"></div>
+    <!-- 【改动】主体容器，画布 + 右侧属性面板 -->
+    <div class="main-wrap">
+        <div id="canvas"></div>
+        <div id="properties-panel"></div>
+    </div>
 </div>
 
 <!-- 选择部署弹窗 -->
@@ -70,20 +79,51 @@
     </div>
 </div>
 
-<!-- bpmn-js -->
-<script src="https://cdn.jsdelivr.net/npm/bpmn-js@11.5.0/dist/bpmn-modeler.development.js"></script>
-<script>
-    const bpmnModeler = new BpmnJS({
-        container: '#canvas'
-    });
+<!-- bpmn-js（已本地化到 static/vendor） -->
+<script th:src="@{/vendor/bpmn-modeler.development.js}"></script>
+<!-- 属性面板 1.20.0 UMD 构建，全局变量是 BpmnJSPropertiesPanel -->
+<script th:src="@{/vendor/bpmn-js-properties-panel.umd.js}"></script>
+<!-- 最小化 flowable moddle 扩展，全局变量是 FlowableModdleDescriptor -->
+<script th:src="@{/vendor/flowable-moddle.js}"></script>
 
-    // 空白模板
+<script>
+    // bpmn-js 的 UMD 全局名是 BpmnJS；属性面板是 BpmnJSPropertiesPanel
+    // （原代码取的 window['bpmn-js-properties-panel']、window['flowable-bpmn-moddle'] 都是 undefined，
+    //   additionalModules 里塞了 undefined 会让 new BpmnJS 直接抛错，页面只剩工具栏，表现为"打不开"）
+    const { BpmnPropertiesPanelModule, BpmnPropertiesProviderModule } = window.BpmnJSPropertiesPanel;
+
+    let bpmnModeler = null;
+    try {
+        bpmnModeler = new BpmnJS({
+            container: '#canvas',
+            // 1.x 属性面板用 propertiesPanel.parent 挂载（attachTo 是 0.x 的老 API）
+            propertiesPanel: {
+                parent: '#properties-panel'
+            },
+            additionalModules: [
+                BpmnPropertiesPanelModule,
+                BpmnPropertiesProviderModule
+            ],
+            moddleExtensions: {
+                flowable: window.FlowableModdleDescriptor
+            }
+        });
+    } catch (e) {
+        console.error('流程设计器初始化失败', e);
+        document.getElementById('canvas').innerHTML =
+            '<div style="padding:24px;color:#c00;font-family:monospace;">编辑器初始化失败：' +
+            (e && e.message) + '</div>';
+    }
+
+    // 空白模板（带上flowable命名空间！）
     async function createNewDiagram() {
+        if (!bpmnModeler) return;
         const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100501/BPMN20"
   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100501/DI"
   xmlns:dc="http://www.omg.org/spec/DD/20100501/DC"
   xmlns:di="http://www.omg.org/spec/DD/20100501/DI"
+  xmlns:flowable="http://flowable.org/bpmn"
   id="Definitions_1"
   targetNamespace="http://flowable.org/bpmn">
   <bpmn:process id="Process_1" isExecutable="true">
@@ -98,8 +138,13 @@
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
         await bpmnModeler.importXML(emptyXml);
+        try {
+            bpmnModeler.get('canvas').zoom('fit-viewport');
+        } catch (e) {
+            console.warn('画布缩放失败', e);
+        }
     }
-    createNewDiagram();
+    createNewDiagram().catch(e => console.error('初始化画布失败', e));
 
     // 导入本地文件
     document.getElementById('btnImport').onclick = ()=>{

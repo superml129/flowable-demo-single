@@ -34,7 +34,14 @@ public class LeaveController {
     public String start(){
         Map<String,Object> vars=new HashMap<>();
         vars.put("manager","zhangsan");
-        var instance = runtimeService.startProcessInstanceByKey("leaveProcess", vars);
+        // 设置认证用户，让引擎记录流程发起人（消息通知依赖它）
+        org.flowable.common.engine.impl.identity.Authentication.setAuthenticatedUserId("zhangsan");
+        ProcessInstance instance;
+        try {
+            instance = runtimeService.startProcessInstanceByKey("leaveProcess", vars);
+        } finally {
+            org.flowable.common.engine.impl.identity.Authentication.setAuthenticatedUserId(null);
+        }
         return "流程实例id:"+instance.getId();
     }
 

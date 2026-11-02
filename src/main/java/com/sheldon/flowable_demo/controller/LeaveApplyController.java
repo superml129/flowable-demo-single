@@ -1,5 +1,6 @@
 package com.sheldon.flowable_demo.controller;
 
+import org.flowable.common.engine.impl.identity.Authentication;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,7 +33,8 @@ public class LeaveApplyController {
 
     // 提交表单，启动流程
     @PostMapping("/submit")
-    public String submitLeave(@RequestParam String applyUser,
+    public String submitLeave(HttpSession session,
+                              @RequestParam String applyUser,
                               @RequestParam Integer leaveDays,
                               @RequestParam String leaveReason,
                               @RequestParam String manager,   //新增
@@ -43,8 +46,17 @@ public class LeaveApplyController {
         variables.put("leaveReason",leaveReason);
         variables.put("manager",manager);
 
-        // 启动流程，key对应bpmn里面的id
-        String instanceId = runtimeService.startProcessInstanceByKey("leaveProcess", variables).getId();
+        // 关键：启动前设置认证用户，Flowable 才会记录 startUserId（流程发起人），
+        // 否则全局任务完成通知监听器拿不到发起人，无法推送消息
+        String loginUser = (String) session.getAttribute("loginUser");
+        Authentication.setAuthenticatedUserId(loginUser != null ? loginUser : applyUser);
+        String instanceId;
+        try {
+            // 启动流程，key对应bpmn里面的id
+            instanceId = runtimeService.startProcessInstanceByKey("leaveProcess", variables).getId();
+        } finally {
+            Authentication.setAuthenticatedUserId(null);
+        }
 
         // 查询刚刚产生的下一步待办任务
         Task task = taskService.createTaskQuery()

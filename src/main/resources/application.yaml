@@ -22,6 +22,11 @@ flowable:
   database-schema-update: true
   # 关闭自带web页面（不需要modeler就关掉）
   rest-api-enabled: false
+# mybatis配置
+mybatis:
+  configuration:
+    # 开启下划线列名 -> 驼峰属性自动映射（如 msg_content -> msgContent）
+    map-underscore-to-camel-case: true
 # 日志配置
 logging:
   level:

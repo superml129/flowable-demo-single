@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<div th:fragment="statusBar">
+    <style>
+        /* 底部状态栏 */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 42px;
+            background: #2c3e50;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 998;
+        }
+        .bell-wrap {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .bell-icon{
+            font-size:20px;
+            color:#fff;
+        }
+        .bell-badge{
+            position:absolute;
+            top:-6px;
+            right:-6px;
+            background:#e53e3e;
+            color:#fff;
+            font-size:11px;
+            padding:1px 5px;
+            border-radius:10px;
+            min-width:18px;
+            text-align:center;
+            display:none;
+        }
+        /* 弹窗向上弹出：铃铛在状态栏左侧，用 left 对齐向右展开，避免伸出屏幕左边 */
+        .bell-panel{
+            position:fixed;
+            bottom: 46px;
+            left: 20px;
+            width:240px;
+            max-width:calc(100vw - 28px);
+            background:#fff;
+            box-shadow:0 -2px 12px rgba(0,0,0,0.15);
+            border-radius:6px;
+            padding:12px;
+            z-index:999;
+            display:none;
+            max-height:420px;
+            overflow-y:auto;
+        }
+        /* 小三角，指向铃铛 */
+        .bell-panel::after{
+            content: "";
+            position: absolute;
+            left: 12px;
+            bottom: -8px;
+            border-width: 8px 8px 0 8px;
+            border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+        }
+        .bell-item{
+            padding:10px 4px;
+            border-bottom:1px solid #eee;
+            font-size:14px;
+            cursor:pointer;
+        }
+        .bell-item.unread{
+            background:#f0f7ff;
+        }
+        .bell-allread{
+            text-align:right;
+            margin-top:8px;
+        }
+        .bell-allread a{
+            color:#3490dc;
+            font-size:13px;
+            cursor:pointer;
+        }
+        /* 页面预留底部空间，不被状态栏遮挡 */
+        body{
+            padding-bottom: 42px;
+        }
+    </style>
+    <div class="status-bar">
+        <div class="bell-wrap">
+            <span class="bell-icon">🔔</span>
+            <span class="bell-badge" id="msgBadge">0</span>
+            <div class="bell-panel" id="msgPanel">
+                <div id="msgListBox"></div>
+                <div class="bell-allread">
+                    <a onclick="readAllMsg()">全部标为已读</a>
+                </div>
+            </div>
+        </div>
+        <div style="color:#fff;margin-left:24px;font-size:14px;">
+            当前登录用户：<span th:text="${session.loginUser}"></span>
+        </div>
+    </div>
+
+    <script>
+        let source = null;
+        // 初始化SSE实时连接
+        function initSSE(){
+            if (!!window.EventSource) {
+                source = new EventSource('/flowMsg/connect');
+                source.addEventListener('newMsg', function(e) {
+                    const data = JSON.parse(e.data);
+                    // 更新角标
+                    setBadge(data.unReadCount);
+                });
+                source.onerror = function() {
+                    source.close();
+                    // 断线自动重连
+                    setTimeout(initSSE, 3000);
+                };
+            }
+        }
+        // 设置角标，>99显示99+
+        function setBadge(count){
+            const badge = document.getElementById('msgBadge');
+            if(count <=0){
+                badge.style.display = 'none';
+                badge.innerText = 0;
+            }else if(count >99){
+                badge.innerText = '99+';
+                badge.style.display = 'block';
+            }else{
+                badge.innerText = count;
+                badge.style.display = 'block';
+            }
+        }
+        // 加载未读数
+        function loadUnReadCount(){
+            fetch('/flowMsg/unReadCount')
+                .then(res=>res.json())
+                .then(data=>{
+                    setBadge(data.count);
+                })
+        }
+        // 打开消息面板
+        function openMsgPanel(){
+            const panel = document.getElementById('msgPanel');
+            if(panel.style.display === 'block'){
+                panel.style.display = 'none';
+                return;
+            }
+            fetch('/flowMsg/list')
+                .then(res=>res.json())
+                .then(list=>{
+                    let html = '';
+                    list.forEach(item=>{
+                        html += `<div class="bell-item ${item.isRead===0?'unread':''}">
+                                ${item.msgContent}<br>
+                                <small style="color:#777">${item.createTime}</small>
+                             </div>`
+                    })
+                    document.getElementById('msgListBox').innerHTML = html;
+                    panel.style.display = 'block';
+                })
+        }
+        // 全部标记已读
+        function readAllMsg(){
+            fetch('/flowMsg/readAll').then(()=>{
+                loadUnReadCount();
+                openMsgPanel();
+            })
+        }
+        // 铃铛点击
+        document.querySelector('.bell-wrap').addEventListener('click',e=>{
+            e.stopPropagation();
+            openMsgPanel();
+        })
+        // 空白处关闭弹窗
+        document.addEventListener('click',()=>{
+            document.getElementById('msgPanel').style.display='none';
+        })
+        // 页面加载初始化
+        loadUnReadCount();
+        initSSE();
+    </script>
+</div>

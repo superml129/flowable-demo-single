@@ -28,6 +28,8 @@ public class LoginInterceptor implements WebMvcConfigurer {
                     }
                 })
                 .addPathPatterns("/**")
-                .excludePathPatterns("/login/**", "/css/**", "/captcha");
+                // 静态资源放行，避免 session 过期时 vendor 下的 js/css 被 302 成登录页
+                .excludePathPatterns("/login/**", "/css/**", "/captcha",
+                        "/vendor/**", "/static/**", "/favicon.svg", "/error");
     }
 }

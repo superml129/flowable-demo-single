@@ -35,10 +35,37 @@
         th:nth-child(5){width:28%;}
         th:nth-child(6){width:12%;}
 
-        th{background:#2c3e50;color:#fff;font-weight:normal;}
+        th{
+            background:#2c3e50;
+            color:#fff;
+            font-weight:normal;
+            position: relative;
+            user-select: none;
+            /* 常驻列分割白线，一直看得见 */
+            border-right:1px solid rgba(255,255,255,0.3);
+        }
+        /* 最后一列表头取消右边框，避免多余竖线 */
+        th:last-child{
+            border-right: none;
+        }
         tr:hover{background:#f3f6fa;}
         .btn{padding:4px 10px;border-radius:4px;text-decoration:none;font-size:13px;}
         .btn-view{background:#3490dc;color:#fff;}
+
+        /* 拖拽分割把手 */
+        #defTable th .col-resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 3px;
+            height: 100%;
+            cursor: col-resize;
+            background: transparent;
+            z-index: 2;
+        }
+        #defTable th .col-resizer:hover {
+            background: rgba(255,255,255,0.55);
+        }
     </style>
 </head>
 <body>
@@ -47,7 +74,7 @@
 </div>
 <div class="container">
     <h3>📋 已定义流程列表</h3>
-    <table>
+    <table id="defTable" style="table-layout:fixed;width:100%;border-collapse:collapse;">
         <thead>
         <tr>
             <th>流程名称</th>
@@ -91,6 +118,53 @@
         tableBody.innerHTML = html;
     }
     loadDefList();
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const table = document.getElementById('defTable');
+        if (!table) return;
+
+        const ths = table.querySelectorAll('th');
+        let dragging = false;
+        let startX = 0;
+        let startWidth = 0;
+        let dragTh = null;
+        const MIN_WIDTH = 60; // 最小列宽
+
+        // 给每个th插入拖拽条
+        ths.forEach(th => {
+            const resizer = document.createElement('div');
+            resizer.className = 'col-resizer';
+            th.appendChild(resizer);
+
+            resizer.addEventListener('mousedown', function (e) {
+                dragging = true;
+                dragTh = th;
+                startX = e.pageX;
+                startWidth = th.offsetWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!dragging || !dragTh) return;
+            const dx = e.pageX - startX;
+            const newW = startWidth + dx;
+            if (newW >= MIN_WIDTH) {
+                dragTh.style.width = newW + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (dragging) {
+                dragging = false;
+                dragTh = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    });
 </script>
 </body>
 </html>
