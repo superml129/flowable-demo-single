@@ -73,6 +73,13 @@
         .bell-item.unread{
             background:#f0f7ff;
         }
+        /* 已读消息灰显 */
+        .bell-item.read{
+            color:#aaa;
+        }
+        .bell-item.read small{
+            color:#c8c8c8 !important;
+        }
         .bell-allread{
             text-align:right;
             margin-top:8px;
@@ -93,8 +100,9 @@
             <span class="bell-badge" id="msgBadge">0</span>
             <div class="bell-panel" id="msgPanel">
                 <div id="msgListBox"></div>
-                <div class="bell-allread">
+                <div class="bell-allread" id="panelFooter">
                     <a onclick="readAllMsg()">全部标为已读</a>
+                    <a onclick="clearMsg()" style="margin-left:12px;color:#999;">清空记录</a>
                 </div>
             </div>
         </div>
@@ -143,24 +151,38 @@
                     setBadge(data.count);
                 })
         }
-        // 打开消息面板
-        function openMsgPanel(){
+        // 打开消息面板（force=true 表示刷新已打开的面板，不做开关切换）
+        function openMsgPanel(force){
             const panel = document.getElementById('msgPanel');
-            if(panel.style.display === 'block'){
+            if(!force && panel.style.display === 'block'){
                 panel.style.display = 'none';
                 return;
             }
             fetch('/flowMsg/list')
                 .then(res=>res.json())
                 .then(list=>{
-                    let html = '';
-                    list.forEach(item=>{
-                        html += `<div class="bell-item ${item.isRead===0?'unread':''}">
-                                ${item.msgContent}<br>
-                                <small style="color:#777">${item.createTime}</small>
-                             </div>`
-                    })
-                    document.getElementById('msgListBox').innerHTML = html;
+                    const box = document.getElementById('msgListBox');
+                    const footer = document.getElementById('panelFooter');
+                    if(!list || list.length === 0){
+                        box.innerHTML = '<div style="text-align:center;color:#999;padding:16px 0;font-size:13px;">暂无消息</div>';
+                        footer.style.display = 'none';
+                    }else{
+                        let html = '';
+                        let hasUnread = false;
+                        list.forEach(item=>{
+                            const unread = item.isRead === 0;
+                            if(unread) hasUnread = true;
+                            const time = (item.createTime || '').replace('T',' ').substring(0,16);
+                            html += `<div class="bell-item ${unread?'unread':'read'}">
+                                    ${item.msgContent}<br>
+                                    <small style="color:#777">${time}</small>
+                                 </div>`;
+                        })
+                        box.innerHTML = html;
+                        // 没有未读时隐藏"全部标为已读"，只留"清空记录"
+                        footer.style.display = 'block';
+                        footer.children[0].style.display = hasUnread ? 'inline' : 'none';
+                    }
                     panel.style.display = 'block';
                 })
         }
@@ -168,7 +190,15 @@
         function readAllMsg(){
             fetch('/flowMsg/readAll').then(()=>{
                 loadUnReadCount();
-                openMsgPanel();
+                openMsgPanel(true);
+            })
+        }
+        // 清空消息记录（不可恢复）
+        function clearMsg(){
+            if(!confirm('确定清空全部消息记录吗？此操作不可恢复。')) return;
+            fetch('/flowMsg/clear').then(()=>{
+                loadUnReadCount();
+                openMsgPanel(true);
             })
         }
         // 铃铛点击

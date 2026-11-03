@@ -64,4 +64,15 @@ public class FlowMsgController {
         }
         return "ok";
     }
+
+    // 清空当前用户的消息记录
+    @GetMapping("/clear")
+    @ResponseBody
+    public String clear(HttpSession session){
+        String loginUser = (String) session.getAttribute("loginUser");
+        if(loginUser != null){
+            flowMsgMapper.clearAll(loginUser);
+        }
+        return "ok";
+    }
 }

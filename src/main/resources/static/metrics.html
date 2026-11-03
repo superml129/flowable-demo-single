@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>应用监控面板</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:"Microsoft YaHei",sans-serif;background:#f4f6f9;color:#333;padding:24px;}
+        h1{font-size:20px;margin-bottom:4px;}
+        .sub{color:#888;font-size:13px;margin-bottom:20px;}
+        .sub b{color:#2c7be5;}
+        h2{font-size:15px;margin:22px 0 10px;color:#555;border-left:4px solid #2c7be5;padding-left:8px;}
+        .cards{display:flex;gap:12px;flex-wrap:wrap;}
+        .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:14px 18px;min-width:150px;flex:1;}
+        .card .label{font-size:12px;color:#888;}
+        .card .value{font-size:26px;font-weight:600;margin-top:4px;}
+        .card .pool{font-size:12px;color:#2c7be5;margin-top:2px;}
+        table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+        th,td{padding:9px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0f0f0;}
+        th{background:#f8f9fb;color:#666;font-weight:500;}
+        td.v{font-weight:600;}
+        .tag{display:inline-block;background:#e8f1ff;color:#2c7be5;border-radius:4px;padding:1px 6px;font-size:12px;margin-right:4px;}
+        .na{color:#bbb;}
+        .bar{height:6px;border-radius:3px;background:#e9edf3;margin-top:8px;overflow:hidden;}
+        .bar i{display:block;height:100%;background:#2c7be5;border-radius:3px;transition:width .4s;}
+        .warn i{background:#f6a609;}
+    </style>
+</head>
+<body>
+<h1>应用监控面板</h1>
+<div class="sub">数据来源：Spring Boot Actuator，每 5 秒自动刷新 · 上次刷新：<b id="refreshTime">-</b></div>
+
+<h2>连接池（HikariCP）</h2>
+<div class="cards" id="poolCards"></div>
+
+<h2>指标明细</h2>
+<table>
+    <thead><tr><th>指标</th><th>说明</th><th>值</th><th>标签</th></tr></thead>
+    <tbody id="detailBody"></tbody>
+</table>
+
+<script>
+    // 指标定义：name=actuator指标名, label=中文说明, unit=单位, perPool=按pool标签拆分展示
+    const METRICS = [
+        {name:'hikaricp.connections',            label:'连接总数',   perPool:true,  card:true},
+        {name:'hikaricp.connections.idle',       label:'空闲连接',   perPool:true,  card:true},
+        {name:'hikaricp.connections.active',     label:'活跃连接',   perPool:true,  card:true},
+        {name:'hikaricp.connections.pending',    label:'等待线程',   perPool:true,  card:true},
+        {name:'hikaricp.connections.creation',   label:'连接创建耗时', unit:'ms'},
+        {name:'hikaricp.connections.usage',      label:'连接使用时长', unit:'ms'},
+        {name:'hikaricp.connections.timeout',    label:'获取超时次数'},
+        {name:'jdbc.connections.active',         label:'JDBC活跃连接'},
+        {name:'jvm.memory.used',                 label:'JVM内存已用', unit:'B'},
+        {name:'jvm.memory.max',                  label:'JVM内存上限', unit:'B'},
+        {name:'jvm.threads.live',                label:'JVM线程数'},
+        {name:'process.cpu.usage',               label:'进程CPU使用率', unit:'ratio'},
+        {name:'system.cpu.usage',                label:'系统CPU使用率', unit:'ratio'},
+        {name:'process.uptime',                  label:'应用运行时长', unit:'s'},
+        {name:'http.server.requests',            label:'HTTP请求总数', tag:'outcome'}
+    ];
+
+    function fmt(v, unit){
+        if(v === null || v === undefined) return '<span class="na">无数据</span>';
+        if(unit === 'B')  return (v/1024/1024).toFixed(1) + ' MB';
+        if(unit === 's')  { const s = Math.round(v); return Math.floor(s/86400)+'天'+Math.floor(s%86400/3600)+'时'+Math.floor(s%3600/60)+'分'; }
+        if(unit === 'ratio') return (v*100).toFixed(1) + ' %';
+        if(unit === 'ms') return v.toFixed(1) + ' ms';
+        return Number.isInteger(v) ? v : v.toFixed(2);
+    }
+
+    function fetchMetric(m){
+        return fetch('/actuator/metrics/' + m.name)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null);
+    }
+
+    function render(){
+        Promise.all(METRICS.map(fetchMetric)).then(results => {
+            const cards = [];
+            const rows = [];
+            // 连接池卡片
+            const conn = results[0], idle = results[1], active = results[2], pending = results[3];
+            const pools = conn ? new Set([
+                ...(conn.availableTags?.find(t=>t.tag==='pool')?.values || []),
+                ...(idle.availableTags?.find(t=>t.tag==='pool')?.values || []),
+                ...(active.availableTags?.find(t=>t.tag==='pool')?.values || [])
+            ]) : [];
+            pools.forEach(pool => {
+                const val = (data, def=0) => {
+                    if(!data) return def;
+                    const idx = data.availableTags?.findIndex(t=>t.tag==='pool') ?? -1;
+                    if(idx < 0) return data.measurements[0]?.value ?? def;
+                    return data.measurements[idx]?.value ?? def;
+                };
+                const total = val(conn), i = val(idle), a = val(active), p = val(pending);
+                cards.push(`<div class="card">
+                    <div class="label">连接池</div>
+                    <div class="value">${pool}</div>
+                    <div class="pool">总计 ${total} · 空闲 ${i} · 活跃 ${a}${p>0?' · 等待 '+p:''}</div>
+                    <div class="bar ${a/15>0.8?'warn':''}"><i style="width:${Math.min(100, a/15*100)}%"></i></div>
+                </div>`);
+            });
+            if(cards.length === 0) cards.push('<div class="card"><div class="value na">连接池无数据</div></div>');
+            document.getElementById('poolCards').innerHTML = cards.join('');
+
+            // 明细表
+            METRICS.forEach((m, idx) => {
+                const data = results[idx];
+                if(!data){ rows.push(`<tr><td>${m.name}</td><td>${m.label}</td><td class="na">无数据</td><td></td></tr>`); return; }
+                const n = data.measurements.length;
+                const poolVals = data.availableTags?.find(t=>t.tag==='pool')?.values;
+                poolVals?.forEach((pool, i) => {
+                    rows.push(`<tr><td>${m.name}</td><td>${m.label}</td><td class="v">${fmt(data.measurements[i]?.value, m.unit)}</td><td><span class="tag">pool=${pool}</span></td></tr>`);
+                });
+                if(!poolVals){
+                    const tags = (data.availableTags||[]).map(t=>`<span class="tag">${t.tag}=${t.values[0]}</span>`).join('');
+                    rows.push(`<tr><td>${m.name}</td><td>${m.label}</td><td class="v">${fmt(data.measurements[0]?.value, m.unit)}</td><td>${tags}</td></tr>`);
+                }
+            });
+            document.getElementById('detailBody').innerHTML = rows.join('');
+            document.getElementById('refreshTime').innerText = new Date().toLocaleTimeString();
+        });
+    }
+
+    render();
+    setInterval(render, 5000);
+</script>
+</body>
+</html>

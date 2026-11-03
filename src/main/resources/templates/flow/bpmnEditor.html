@@ -2,21 +2,63 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>流程设计器</title>
-    <!-- bpmn-js css（本地化，避免 CDN 不可达导致白屏） -->
+    <title>流程设计器｜图形+XML双向联动</title>
+    <!-- bpmn-js css（本地化） -->
     <link rel="stylesheet" th:href="@{/vendor/bpmn-js/diagram-js.css}">
     <link rel="stylesheet" th:href="@{/vendor/bpmn-js/bpmn-font/css/bpmn.css}">
     <!-- 属性面板样式 -->
     <link rel="stylesheet" th:href="@{/vendor/properties-panel/properties-panel.css}">
+    <!-- CodeMirror 高亮 -->
+    <link rel="stylesheet" th:href="@{/vendor/codemirror/codemirror.css}">
+    <link rel="stylesheet" th:href="@{/vendor/codemirror/addon/fold/foldgutter.css}">
     <style>
         * {margin:0;padding:0;box-sizing:border-box;}
         .container{height:100vh;display:flex;flex-direction:column;}
         .toolbar{height:50px;background:#2c3e50;display:flex;gap:10px;align-items:center;padding:0 16px;}
-        .toolbar button{padding:6px 12px;cursor:pointer;border:none;border-radius:4px;}
-        /* 主体：画布 + 属性面板并排 */
-        .main-wrap{flex:1;display:flex;}
-        #canvas{flex:1;}
-        #properties-panel{width:340px;border-left:1px solid #ddd;overflow:auto;}
+        .toolbar button{padding:6px 12px;cursor:pointer;border:none;border-radius:4px;color:#fff;background:#34495e;}
+        .toolbar button:hover{background:#3490dc;transition:0.2s;}
+        .toolbar a{text-decoration: none;}
+        /* 主体：XML高亮 | 画布 | 属性面板 */
+        .main-wrap{flex:1;display:flex;overflow:hidden;}
+        .xml-wrap{width:34%;flex:0 0 auto;height:100%;display:flex;flex-direction:column;border-right:none;min-width:180px;}
+        /* 代码区/画布之间的可拖动分隔条 */
+        .v-splitter{
+            flex:0 0 6px;width:6px;height:100%;cursor:col-resize;
+            background:#f2f2f2;border-left:1px solid #ddd;border-right:1px solid #ddd;
+            display:flex;align-items:center;justify-content:center;
+        }
+        .v-splitter:hover,.v-splitter.active{background:#cfe3f7;}
+        .v-splitter .grip{width:2px;height:32px;background:#b6b6b6;border-radius:1px;}
+        body.resizing{cursor:col-resize;user-select:none;}
+        body.resizing .v-splitter{background:#cfe3f7;}
+        .xml-title{padding:8px 12px;background:#eee;font-size:14px;font-weight:bold;}
+        .cm-wrap{flex:1;overflow:hidden;}
+        .CodeMirror{height:100%;font-family:Consolas,monospace;font-size:12px;}
+        /* 画布选中节点时，左侧 XML 中对应代码块的高亮 */
+        .cm-hl-node{
+            background:rgba(255,214,102,0.45);
+            box-shadow:inset 2px 0 0 #f0a020;
+            border-radius:2px;
+        }
+        .xml-error{color:#c00;padding:6px 12px;background:#ffe9e9;display:none;font-size:13px;}
+        #canvas{flex:1;height:100%;min-width:0;}
+        #properties-panel{width:24%;min-width:220px;overflow:auto;border-left:1px solid #ddd;}
+
+        /* 属性面板折叠开关（画布与面板之间的竖条） */
+        .panel-toggle{
+            width:12px;height:100%;cursor:pointer;
+            background:#f5f5f5;border-left:1px solid #ddd;
+            display:flex;align-items:center;justify-content:center;
+            user-select:none;flex-shrink:0;
+        }
+        .panel-toggle:hover{background:#e8f1fb;}
+        .panel-toggle .arrow{
+            font-size:10px;color:#666;
+            transition:transform 0.2s;
+        }
+        /* 收起状态：面板隐藏，箭头反向 */
+        .main-wrap.panel-collapsed #properties-panel{display:none;}
+        .main-wrap.panel-collapsed .panel-toggle .arrow{transform:rotate(180deg);}
 
         /* 弹窗样式 */
         .modal{
@@ -42,9 +84,6 @@
         .modal-btn-group{
             display:flex;gap:10px;justify-content:flex-end;margin-top:10px;
         }
-        .toolbar a{
-            text-decoration: none;
-        }
     </style>
 </head>
 <body>
@@ -59,9 +98,24 @@
         <button id="btnDeploy">部署到Flowable</button>
         <input type="file" id="fileInput" accept=".xml,.bpmn" style="display:none">
     </div>
-    <!-- 【改动】主体容器，画布 + 右侧属性面板 -->
+    <!-- 主体顺序：【XML】→【画布】→【属性面板】 -->
     <div class="main-wrap">
+        <div class="xml-wrap">
+            <div class="xml-title">BPMN20 XML（可编辑，双向联动）</div>
+            <div class="xml-error" id="xmlErrorTip">XML解析失败，请检查语法</div>
+            <div class="cm-wrap">
+                <textarea id="xmlEditor"></textarea>
+            </div>
+        </div>
+        <!-- 代码区 / 画布 可拖动分隔条（双击恢复默认比例） -->
+        <div class="v-splitter" id="xmlSplitter" title="左右拖动调整宽度，双击恢复默认">
+            <span class="grip"></span>
+        </div>
         <div id="canvas"></div>
+        <!-- 属性面板折叠开关 -->
+        <div class="panel-toggle" id="panelToggle" title="展开/收起属性面板">
+            <span class="arrow">▶</span>
+        </div>
         <div id="properties-panel"></div>
     </div>
 </div>
@@ -79,24 +133,54 @@
     </div>
 </div>
 
-<!-- bpmn-js（已本地化到 static/vendor） -->
+<!-- 本地化js -->
 <script th:src="@{/vendor/bpmn-modeler.development.js}"></script>
-<!-- 属性面板 1.20.0 UMD 构建，全局变量是 BpmnJSPropertiesPanel -->
 <script th:src="@{/vendor/bpmn-js-properties-panel.umd.js}"></script>
-<!-- 最小化 flowable moddle 扩展，全局变量是 FlowableModdleDescriptor -->
 <script th:src="@{/vendor/flowable-moddle.js}"></script>
+<!-- CodeMirror 高亮 -->
+<script th:src="@{/vendor/codemirror/codemirror.js}"></script>
+<script th:src="@{/vendor/codemirror/xml.js}"></script>
+<script th:src="@{/vendor/codemirror/addon/fold/foldcode.js}"></script>
+<script th:src="@{/vendor/codemirror/addon/fold/xml-fold.js}"></script>
+<script th:src="@{/vendor/codemirror/addon/fold/foldgutter.js}"></script>
 
 <script>
-    // bpmn-js 的 UMD 全局名是 BpmnJS；属性面板是 BpmnJSPropertiesPanel
-    // （原代码取的 window['bpmn-js-properties-panel']、window['flowable-bpmn-moddle'] 都是 undefined，
-    //   additionalModules 里塞了 undefined 会让 new BpmnJS 直接抛错，页面只剩工具栏，表现为"打不开"）
-    const { BpmnPropertiesPanelModule, BpmnPropertiesProviderModule } = window.BpmnJSPropertiesPanel;
+    // 依赖自检：任一前端库缺失时在画布区明确报错，避免"整页无响应"
+    (function(){
+        const miss = [];
+        if (typeof CodeMirror === 'undefined') miss.push('CodeMirror');
+        if (typeof BpmnJS === 'undefined') miss.push('bpmn-js');
+        if (!window.BpmnJSPropertiesPanel) miss.push('bpmn-js-properties-panel');
+        if (!window.FlowableModdleDescriptor) miss.push('flowable-moddle');
+        if (miss.length) {
+            document.getElementById('canvas').innerHTML =
+                '<div style="padding:24px;color:#c00;font-family:monospace;line-height:1.8;">' +
+                '前端依赖加载失败：' + miss.join('、') +
+                '<br>请检查 /vendor 下对应文件是否可访问（F12 → Network 看 404）。</div>';
+            throw new Error('missing front-end deps: ' + miss.join(','));
+        }
+    })();
 
+    const { BpmnPropertiesPanelModule, BpmnPropertiesProviderModule } = window.BpmnJSPropertiesPanel;
     let bpmnModeler = null;
+    let cmEditor = null;
+    let isSyncing = false; // 互斥锁，防止循环刷新
+    let xmlDebounceTimer = null;
+
+    // 初始化codemirror xml高亮编辑器
+    cmEditor = CodeMirror.fromTextArea(document.getElementById('xmlEditor'), {
+        mode: 'xml',
+        lineNumbers: true,
+        lineWrapping: true,
+        indentUnit: 2,
+        tabSize: 2,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
+    });
+
     try {
         bpmnModeler = new BpmnJS({
             container: '#canvas',
-            // 1.x 属性面板用 propertiesPanel.parent 挂载（attachTo 是 0.x 的老 API）
             propertiesPanel: {
                 parent: '#properties-panel'
             },
@@ -115,14 +199,27 @@
             (e && e.message) + '</div>';
     }
 
-    // 空白模板（带上flowable命名空间！）
+    // 加载xml到画布
+    async function loadXmlToCanvas(xmlStr) {
+        if (!bpmnModeler) return;
+        try {
+            document.getElementById('xmlErrorTip').style.display = 'none';
+            await bpmnModeler.importXML(xmlStr);
+            bpmnModeler.get('canvas').zoom('fit-viewport');
+        } catch (err) {
+            console.error('importXML error', err);
+            document.getElementById('xmlErrorTip').style.display = 'block';
+        }
+    }
+
+    // 空白模板（带上flowable命名空间）
     async function createNewDiagram() {
         if (!bpmnModeler) return;
         const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100501/BPMN20"
-  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100501/DI"
-  xmlns:dc="http://www.omg.org/spec/DD/20100501/DC"
-  xmlns:di="http://www.omg.org/spec/DD/20100501/DI"
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
   xmlns:flowable="http://flowable.org/bpmn"
   id="Definitions_1"
   targetNamespace="http://flowable.org/bpmn">
@@ -137,13 +234,193 @@
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
-        await bpmnModeler.importXML(emptyXml);
-        try {
-            bpmnModeler.get('canvas').zoom('fit-viewport');
-        } catch (e) {
-            console.warn('画布缩放失败', e);
-        }
+        cmEditor.setValue(emptyXml);
+        await loadXmlToCanvas(emptyXml);
     }
+
+    // ========== 属性面板折叠 ==========
+    (function(){
+        const mainWrap = document.querySelector('.main-wrap');
+        const toggle = document.getElementById('panelToggle');
+        const KEY = 'bpmnEditor.panelCollapsed';
+
+        // 恢复上次的折叠状态
+        if (localStorage.getItem(KEY) === '1') {
+            mainWrap.classList.add('panel-collapsed');
+        }
+
+        toggle.onclick = () => {
+            const collapsed = mainWrap.classList.toggle('panel-collapsed');
+            localStorage.setItem(KEY, collapsed ? '1' : '0');
+            // 面板显隐会改变画布容器尺寸，通知 diagram-js 重算视口
+            if (bpmnModeler) {
+                setTimeout(() => {
+                    bpmnModeler.get('canvas').resized();
+                }, 50);
+            }
+        };
+    })();
+
+    // ========== 代码区 / 画布 左右拖动 ==========
+    (function(){
+        const mainWrap = document.querySelector('.main-wrap');
+        const xmlWrap  = document.querySelector('.xml-wrap');
+        const splitter = document.getElementById('xmlSplitter');
+        const KEY = 'bpmnEditor.xmlWidth';
+        const DEFAULT_PCT = 34;
+
+        // 恢复上次拖动的宽度
+        const saved = parseInt(localStorage.getItem(KEY), 10);
+        if (saved > 0) xmlWrap.style.width = saved + 'px';
+
+        let dragging = false, startX = 0, startW = 0, rafId = null;
+
+        // 尺寸变化后：CodeMirror 需要 refresh 重排，画布需要 resized 重算视口
+        function relayout(){
+            if (cmEditor) cmEditor.refresh();
+            if (bpmnModeler) bpmnModeler.get('canvas').resized();
+        }
+
+        splitter.addEventListener('mousedown', function(e){
+            dragging = true;
+            startX = e.clientX;
+            startW = xmlWrap.getBoundingClientRect().width;
+            splitter.classList.add('active');
+            document.body.classList.add('resizing');
+            e.preventDefault();   // 防止拖动时选中文本
+        });
+
+        document.addEventListener('mousemove', function(e){
+            if (!dragging) return;
+            const total = mainWrap.getBoundingClientRect().width;
+            const min = 180;                       // 代码区最小宽度
+            const max = Math.max(min, total - 320); // 给画布留出最小宽度
+            const w = Math.min(max, Math.max(min, startW + (e.clientX - startX)));
+            xmlWrap.style.width = w + 'px';
+            // 拖动过程用 rAF 节流，避免每个 mousemove 都重排
+            if (!rafId) {
+                rafId = requestAnimationFrame(function(){
+                    rafId = null;
+                    relayout();
+                });
+            }
+        });
+
+        document.addEventListener('mouseup', function(){
+            if (!dragging) return;
+            dragging = false;
+            splitter.classList.remove('active');
+            document.body.classList.remove('resizing');
+            localStorage.setItem(KEY, Math.round(xmlWrap.getBoundingClientRect().width));
+            relayout();
+        });
+
+        // 双击恢复默认 34%
+        splitter.addEventListener('dblclick', function(){
+            const total = mainWrap.getBoundingClientRect().width;
+            xmlWrap.style.width = Math.round(total * DEFAULT_PCT / 100) + 'px';
+            localStorage.removeItem(KEY);
+            relayout();
+        });
+    })();
+
+    // ========== 画布选中节点 → 高亮左侧关联 XML ==========
+    let xmlHlMark = null;   // CodeMirror 文本标记
+    let xmlHlId   = null;   // 当前高亮的元素 id
+
+    function escapeReg(s){
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // 在 XML 文本中定位 id 对应元素的完整代码块 [from, to)
+    function findElementRange(text, id){
+        const idRe = new RegExp('id="' + escapeReg(id) + '"');
+        const m = idRe.exec(text);
+        if (!m) return null;
+
+        // 回退到该标签的 "<" 起点，解析标签名（如 bpmn:userTask）
+        const tagStart = text.lastIndexOf('<', m.index);
+        if (tagStart < 0) return null;
+        const nameMatch = /^<\s*([A-Za-z][\w:.\-]*)/.exec(text.slice(tagStart, tagStart + 100));
+        if (!nameMatch) return null;
+        const tagName = nameMatch[1];
+
+        const gt = text.indexOf('>', m.index);
+        if (gt < 0) return null;
+        // 自闭合标签：<bpmn:startEvent id="x"/>
+        if (text.charAt(gt - 1) === '/') return { from: tagStart, to: gt + 1 };
+
+        // 否则按同名开/闭标签配对，处理嵌套
+        const tagRe = new RegExp('<\\/?' + escapeReg(tagName) + '(?=[\\s>/])', 'g');
+        tagRe.lastIndex = tagStart;
+        let depth = 0, t;
+        while ((t = tagRe.exec(text)) !== null) {
+            const isClose = text.charAt(t.index + 1) === '/';
+            if (isClose) {
+                depth--;
+                if (depth === 0) {
+                    const end = text.indexOf('>', t.index);
+                    return { from: tagStart, to: end < 0 ? gt + 1 : end + 1 };
+                }
+                if (depth < 0) break;
+            } else {
+                depth++;
+            }
+        }
+        return { from: tagStart, to: gt + 1 };
+    }
+
+    // 高亮指定元素对应的 XML；element 为 null 时清除高亮
+    function highlightXmlForElement(element){
+        if (!cmEditor) return;
+        if (xmlHlMark) { xmlHlMark.clear(); xmlHlMark = null; }
+
+        const id = element && element.id;
+        xmlHlId = id || null;
+        if (!id) return;
+
+        const text = cmEditor.getValue();
+        const range = findElementRange(text, id);
+        if (!range) return;
+
+        const from = cmEditor.posFromIndex(range.from);
+        const to = cmEditor.posFromIndex(range.to);
+        xmlHlMark = cmEditor.markText(from, to, { className: 'cm-hl-node' });
+        // 滚动到该代码块（尽量居中显示）
+        cmEditor.scrollIntoView({ line: from.line, ch: 0 }, 120);
+    }
+
+    // 画布/属性面板选择变化时触发
+    bpmnModeler.on('selection.changed', function(e){
+        const selected = (e.newSelection && e.newSelection[0]) || null;
+        highlightXmlForElement(selected);
+    });
+
+    // ========== 双向联动绑定 ==========
+    // 图形变更 → 更新CodeMirror XML
+    bpmnModeler.on('commandStack.changed', async () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        cmEditor.setValue(xml);
+        // setValue 会清空所有 mark，重新按当前选中元素打高亮
+        const selected = bpmnModeler.get('selection').get()[0] || null;
+        highlightXmlForElement(selected);
+        setTimeout(() => isSyncing = false, 100);
+    });
+
+    // CodeMirror编辑 → 更新画布（防抖600ms）
+    cmEditor.on('change', () => {
+        if (isSyncing) return;
+        clearTimeout(xmlDebounceTimer);
+        xmlDebounceTimer = setTimeout(async () => {
+            isSyncing = true;
+            const val = cmEditor.getValue();
+            await loadXmlToCanvas(val);
+            setTimeout(() => isSyncing = false, 100);
+        }, 600);
+    });
+
     createNewDiagram().catch(e => console.error('初始化画布失败', e));
 
     // 导入本地文件
@@ -155,13 +432,9 @@
         if(!file) return;
         const reader = new FileReader();
         reader.onload = async (ev)=>{
-            try{
-                await bpmnModeler.importXML(ev.target.result);
-                alert("导入成功");
-            }catch(err){
-                console.error(err);
-                alert("导入失败，不是合法BPMN");
-            }
+            const xmlStr = ev.target.result;
+            cmEditor.setValue(xmlStr);
+            await loadXmlToCanvas(xmlStr);
         };
         reader.readAsText(file);
     };
@@ -197,11 +470,10 @@
             })
     };
 
-    // ========== 【新增：加载已有流程逻辑】 ==========
+    // ========== 加载已有流程逻辑 ==========
     const modal = document.getElementById('deployModal');
     const deploySelect = document.getElementById('deploySelect');
 
-    // 打开弹窗，拉取部署列表
     document.getElementById('btnLoadDeploy').onclick = async ()=>{
         const res = await fetch("/flow/listDeploy");
         const list = await res.json();
@@ -219,7 +491,6 @@
         modal.style.display = "flex";
     };
 
-    // 确认加载
     document.getElementById('modalConfirm').onclick = async ()=>{
         const deploymentId = deploySelect.value;
         const xmlRes = await fetch("/flow/getXml?deploymentId="+deploymentId);
@@ -229,17 +500,11 @@
             modal.style.display = "none";
             return;
         }
-        try{
-            await bpmnModeler.importXML(xml);
-            alert("加载成功！");
-        }catch(e){
-            console.error(e);
-            alert("xml解析失败");
-        }
+        cmEditor.setValue(xml);
+        await loadXmlToCanvas(xml);
         modal.style.display = "none";
     };
 
-    // 关闭弹窗
     document.getElementById('modalClose').onclick = ()=>{
         modal.style.display = "none";
     }

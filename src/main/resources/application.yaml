@@ -5,23 +5,43 @@ spring:
     dynamic:
       primary: flowable # 默认数据源：flowable_demo（flowable引擎使用）
       strict: false
+      # 连接池：已移除 druid 依赖，dynamic-datasource 回退到 HikariCP，
+      # 下面各数据源的 hikari: 配置此时才会真正生效
       datasource:
         flowable:
           driver-class-name: com.mysql.jdbc.Driver
           url: jdbc:mysql://127.0.0.1:3306/flowable_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
           username: # 请在application-local.yaml填写真实账号
           password: # 请在application-local.yaml填写真实密码
+          hikari:
+            pool-name: flowable-hikari
+            minimum-idle: 5
+            maximum-pool-size: 15
+            idle-timeout: 600000
+            max-lifetime: 1800000
+            connection-timeout: 3000
+            connection-test-query: SELECT 1
         userdb:
           driver-class-name: com.mysql.jdbc.Driver
           url: jdbc:mysql://127.0.0.1:3306/flowable_user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
           username: # 请在application-local.yaml填写真实账号
           password: # 请在application-local.yaml填写真实密码
+          hikari:
+            pool-name: userdb-hikari
+            minimum-idle: 5
+            maximum-pool-size: 15
+            idle-timeout: 600000
+            max-lifetime: 1800000
+            connection-timeout: 3000
+            connection-test-query: SELECT 1
 # flowable配置
 flowable:
   # true：启动自动创建ACT_*数据表；生产环境改为false，手动执行脚本
   database-schema-update: true
   # 关闭自带web页面（不需要modeler就关掉）
   rest-api-enabled: false
+  # 关闭流程定义自动部署（完全由设计器/接口部署）
+  check-process-definitions: false
 # mybatis配置
 mybatis:
   configuration:
@@ -41,3 +61,9 @@ logging:
     org.flowable.history.service.impl.persistence.entity: debug
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+# actuator 端点暴露（注意：management 是顶层配置，不能缩进在 logging 下）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: metrics

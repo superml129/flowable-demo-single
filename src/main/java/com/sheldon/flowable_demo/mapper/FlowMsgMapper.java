@@ -1,6 +1,7 @@
 package com.sheldon.flowable_demo.mapper;
 
 import com.sheldon.flowable_demo.entity.FlowMsg;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -27,6 +28,9 @@ public interface FlowMsgMapper {
 
     @Update("UPDATE flow_msg SET is_read=1 WHERE receiver=#{receiver} AND is_read=0")
     void readAll(@Param("receiver") String receiver);
+
+    @Delete("DELETE FROM flow_msg WHERE receiver=#{receiver}")
+    void clearAll(@Param("receiver") String receiver);
 
     @Insert("INSERT INTO flow_msg(receiver, process_instance_id, process_def_name, task_def_key, task_name, msg_content, is_read, create_time) " +
             "VALUES(#{receiver}, #{processInstanceId}, #{processDefName}, #{taskDefKey}, #{taskName}, #{msgContent}, #{isRead}, NOW())")
