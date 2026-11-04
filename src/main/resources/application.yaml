@@ -1,6 +1,9 @@
 spring:
   profiles:
     active: local
+  # 开发期关闭模板缓存，改完 html 刷新页面即可生效（生产环境应改为 true）
+  thymeleaf:
+    cache: false
   datasource:
     dynamic:
       primary: flowable # 默认数据源：flowable_demo（flowable引擎使用）
@@ -34,9 +37,9 @@ spring:
             max-lifetime: 1800000
             connection-timeout: 3000
             connection-test-query: SELECT 1
+# thymeleaf：开发期关闭模板缓存，改完 html 刷新页面即可生效（生产环境应改为 true）
 # flowable配置
-flowable:
-  # true：启动自动创建ACT_*数据表；生产环境改为false，手动执行脚本
+flowable:  # true：启动自动创建ACT_*数据表；生产环境改为false，手动执行脚本
   database-schema-update: true
   # 关闭自带web页面（不需要modeler就关掉）
   rest-api-enabled: false

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -114,10 +115,23 @@ public class LeaveController {
 
     /**
      * 完成代办任务
+     * 候选组任务（岗位待办）assignee 为空，必须先签收给当前用户才能 complete
      */
     @PostMapping("/task/complete")
     @ResponseBody
-    public String completeTask(@RequestParam String taskId){
+    public String completeTask(@RequestParam String taskId, HttpSession session){
+        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        if (task == null) {
+            return "任务不存在或已完成";
+        }
+        String loginUser = (String) session.getAttribute("loginUser");
+        if (task.getAssignee() == null && loginUser != null) {
+            try {
+                taskService.claim(taskId, loginUser);
+            } catch (Exception e) {
+                return "该任务已被其他人领取";
+            }
+        }
         Map<String,Object> vars = new HashMap<>();
         taskService.complete(taskId,vars);
         return "success";

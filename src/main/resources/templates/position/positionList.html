@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>岗位管理</title>
+    <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+    <link rel="icon"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%232b5797'/><path d='M20 22h24v6H20zM20 32h16v6H20zM20 42h24v6H20z' fill='white'/></svg>">
+    <style>
+        /* ===== 页面局部样式，覆盖 todoTask.css 里的通用表格规则 ===== */
+        body{padding:0;background:#f3f6fa;}
+
+        .pos-layout{
+            display:flex;
+            gap:16px;
+            padding:16px 20px 20px;
+            align-items:flex-start;
+            min-height:calc(100vh - 60px);
+        }
+
+        /* ---- 左侧：岗位列表 ---- */
+        .pos-left{
+            width:340px;flex:0 0 auto;
+            background:#fff;border-radius:8px;
+            box-shadow:0 1px 12px rgba(0,0,0,.07);
+            display:flex;flex-direction:column;
+            max-height:calc(100vh - 92px);
+        }
+        .pos-left-head{
+            padding:14px 16px;border-bottom:1px solid #eaeef3;
+            display:flex;flex-direction:column;gap:10px;
+        }
+        .pos-left-head .row1{
+            display:flex;align-items:center;justify-content:space-between;
+        }
+        .pos-left-head h3{font-size:16px;color:#2c3e50;font-weight:600;}
+        .btn-primary{
+            background:#2b5797;color:#fff;border:none;border-radius:5px;
+            padding:7px 14px;font-size:13px;cursor:pointer;transition:background .2s;
+        }
+        .btn-primary:hover{background:#21456f;}
+        .pos-search{display:flex;gap:8px;}
+        .pos-search input{
+            flex:1;height:34px;padding:0 10px;font-size:13px;
+            border:1px solid #cbd5e1;border-radius:5px;outline:none;
+        }
+        .pos-search input:focus{border-color:#3671d9;}
+
+        .pos-list{overflow-y:auto;flex:1;padding:6px;}
+        .pos-item{
+            padding:10px 12px;border-radius:6px;cursor:pointer;
+            border:1px solid transparent;margin-bottom:4px;transition:background .15s;
+        }
+        .pos-item:hover{background:#f2f6fc;}
+        .pos-item.active{background:#e8f1fd;border-color:#b9d3f5;}
+        .pos-item .line1{
+            display:flex;align-items:center;justify-content:space-between;gap:8px;
+        }
+        .pos-item .pname{font-size:14px;color:#243447;font-weight:600;}
+        .pos-item .pcode{
+            font-size:12px;color:#8a95a5;font-family:Consolas,monospace;
+            margin-top:3px;word-break:break-all;
+        }
+        .pos-item .pdesc{
+            font-size:12px;color:#98a2b3;margin-top:4px;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        }
+        .tag{
+            display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;
+            background:#eef2f7;color:#5b6676;flex-shrink:0;
+        }
+        .tag-off{background:#fdecec;color:#c0392b;}
+        .tag-on{background:#e7f6ec;color:#1f8a4c;}
+        .empty-tip{padding:30px 16px;text-align:center;color:#9aa4b2;font-size:13px;}
+
+        /* ---- 右侧：详情 + 成员 ---- */
+        .pos-right{
+            flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;
+        }
+        .card{
+            background:#fff;border-radius:8px;
+            box-shadow:0 1px 12px rgba(0,0,0,.07);
+        }
+        .card-head{
+            padding:14px 18px;border-bottom:1px solid #eaeef3;
+            display:flex;align-items:center;justify-content:space-between;gap:12px;
+        }
+        .card-head h3{font-size:15px;color:#2c3e50;font-weight:600;}
+        .card-head .ops{display:flex;gap:8px;}
+        .card-body{padding:18px;}
+
+        .placeholder{
+            display:flex;align-items:center;justify-content:center;
+            min-height:320px;color:#9aa4b2;font-size:14px;flex-direction:column;gap:10px;
+        }
+        .placeholder .big{font-size:40px;opacity:.35;}
+
+        /* 详情信息网格 */
+        .info-grid{
+            display:grid;grid-template-columns:96px 1fr;gap:12px 16px;
+            font-size:14px;align-items:start;
+        }
+        .info-grid .k{color:#7a8699;}
+        .info-grid .v{color:#22303f;word-break:break-all;}
+        .info-grid .v.mono{font-family:Consolas,monospace;font-size:13px;}
+
+        /* 成员区 */
+        .member-toolbar{
+            display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+            padding:12px 18px;background:#fafcff;border-bottom:1px solid #eef2f7;
+        }
+        .member-toolbar input[type=text]{
+            height:32px;padding:0 10px;font-size:13px;width:200px;
+            border:1px solid #cbd5e1;border-radius:5px;outline:none;
+        }
+        .member-toolbar input[type=text]:focus{border-color:#3671d9;}
+        .member-toolbar .spacer{flex:1;}
+        .hint{font-size:12px;color:#8a95a5;}
+
+        .member-grid{
+            display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+            gap:8px;padding:16px 18px;
+            max-height:340px;overflow-y:auto;
+        }
+        .user-chip{
+            display:flex;align-items:center;gap:8px;
+            padding:9px 11px;border:1px solid #e3e9f0;border-radius:6px;
+            cursor:pointer;font-size:13px;transition:all .15s;background:#fff;
+        }
+        .user-chip:hover{border-color:#b9d3f5;background:#f7fbff;}
+        .user-chip.checked{border-color:#2b5797;background:#eef5ff;}
+        .user-chip input{margin:0;cursor:pointer;flex-shrink:0;}
+        .user-chip .u-text{display:flex;flex-direction:column;line-height:1.35;min-width:0;}
+        .user-chip .u-name{color:#22303f;font-weight:500;}
+        .user-chip .u-acc{color:#94a0b0;font-size:12px;}
+        /* 「主责」标记：点一下切为主责，再点取消 */
+        .user-chip .primary-pick{
+            margin-left:auto;flex-shrink:0;
+            display:inline-flex;align-items:center;gap:4px;
+            font-size:11.5px;color:#8a95a5;
+            padding:2px 8px;border-radius:9px;
+            border:1px solid #e0e6ee;background:#f7f9fc;
+            cursor:pointer;transition:all .15s;user-select:none;
+        }
+        .user-chip .primary-pick:hover{border-color:#d9b44a;color:#b8860b;background:#fffbea;}
+        .user-chip .primary-pick .primary-dot{
+            width:7px;height:7px;border-radius:50%;
+            border:1px solid #b8c2d0;background:#fff;
+        }
+        .user-chip .primary-pick.on{
+            border-color:#e6c65c;background:#fff7e0;color:#b8860b;font-weight:600;
+        }
+        .user-chip .primary-pick.on .primary-dot{
+            background:#e0a800;border-color:#e0a800;
+        }
+        .user-chip .primary-pick.disabled{
+            opacity:.45;cursor:not-allowed;border-color:#e8ecf1;
+        }
+        .user-chip .primary-pick.disabled:hover{
+            border-color:#e8ecf1;color:#8a95a5;background:#f7f9fc;
+        }
+        .member-empty{padding:24px 18px;color:#9aa4b2;font-size:13px;}
+
+        .btn-ghost{
+            background:#fff;border:1px solid #cbd5e1;color:#43536b;
+            border-radius:5px;padding:6px 13px;font-size:13px;cursor:pointer;
+        }
+        .btn-ghost:hover{border-color:#94a0b0;background:#f7f9fc;}
+        .btn-danger{
+            background:#fff;border:1px solid #e6b8b8;color:#c0392b;
+            border-radius:5px;padding:6px 13px;font-size:13px;cursor:pointer;
+        }
+        .btn-danger:hover{background:#fdf2f2;border-color:#d99;}
+        .btn-mini{
+            background:#2b5797;color:#fff;border:none;border-radius:5px;
+            padding:6px 14px;font-size:13px;cursor:pointer;
+        }
+        .btn-mini:hover{background:#21456f;}
+        .btn-mini[disabled]{background:#b8c4d4;cursor:not-allowed;}
+
+        /* ---- 弹窗 ---- */
+        .modal{
+            display:none;position:fixed;inset:0;background:rgba(17,24,39,.45);
+            z-index:1000;align-items:center;justify-content:center;
+        }
+        .modal.show{display:flex;}
+        .modal-box{
+            width:520px;max-width:calc(100vw - 40px);background:#fff;border-radius:10px;
+            box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden;
+            animation:pop .16s ease-out;
+        }
+        @keyframes pop{from{transform:translateY(-8px);opacity:.6}to{transform:none;opacity:1}}
+        .modal-box h3{
+            margin:0;padding:16px 20px;font-size:15px;color:#243447;
+            border-bottom:1px solid #eef2f7;background:#fafcff;
+        }
+        .modal-body{padding:18px 20px;}
+        .fld{margin-bottom:16px;}
+        .fld:last-child{margin-bottom:0;}
+        .fld label{display:block;font-size:13px;color:#4a5768;margin-bottom:6px;}
+        .fld label .req{color:#e74c3c;margin-left:2px;}
+        .fld input[type=text],.fld textarea,.fld select{
+            width:100%;padding:9px 11px;font-size:13px;
+            border:1px solid #cbd5e1;border-radius:6px;outline:none;
+            font-family:inherit;transition:border-color .15s;
+        }
+        .fld input[type=text]:focus,.fld textarea:focus,.fld select:focus{border-color:#3671d9;}
+        .fld textarea{height:80px;resize:vertical;}
+        .fld .tip{font-size:12px;color:#94a0b0;margin-top:5px;line-height:1.6;}
+        .modal-foot{
+            padding:13px 20px;border-top:1px solid #eef2f7;background:#fafcff;
+            display:flex;justify-content:flex-end;gap:10px;
+        }
+        .err-text{
+            font-size:12.5px;color:#c0392b;background:#fdecec;
+            padding:8px 10px;border-radius:5px;margin-bottom:14px;display:none;
+        }
+        .err-text.show{display:block;}
+
+        /* 轻提示 */
+        #toast{
+            position:fixed;left:50%;top:24px;transform:translateX(-50%) translateY(-20px);
+            background:#243447;color:#fff;padding:10px 18px;border-radius:6px;
+            font-size:13.5px;opacity:0;pointer-events:none;transition:all .25s;z-index:2000;
+            box-shadow:0 6px 20px rgba(0,0,0,.2);
+        }
+        #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        #toast.ok{background:#1f8a4c;}
+        #toast.bad{background:#c0392b;}
+    </style>
+</head>
+<body>
+
+<div th:replace="~{fragments/commonNav :: navBar}"></div>
+
+<div class="pos-layout">
+    <!-- ============ 左侧：岗位列表 ============ -->
+    <div class="pos-left">
+        <div class="pos-left-head">
+            <div class="row1">
+                <h3>岗位列表</h3>
+                <button class="btn-primary" id="btnNew">+ 新增岗位</button>
+            </div>
+            <div class="pos-search">
+                <input type="text" id="kw" placeholder="按编码或名称筛选…">
+                <button class="btn-ghost" id="btnSyncGroup" title="把岗位与成员同步到 Flowable 的 ACT_ID_GROUP / ACT_ID_MEMBERSHIP">同步到引擎</button>
+            </div>
+        </div>
+        <div class="pos-list" id="posList">
+            <div class="empty-tip">加载中…</div>
+        </div>
+    </div>
+
+    <!-- ============ 右侧：详情 + 成员 ============ -->
+    <div class="pos-right">
+        <!-- 未选中 -->
+        <div class="card" id="emptyCard">
+            <div class="placeholder">
+                <div class="big">🗂</div>
+                <div>请从左侧选择一个岗位，或点击「新增岗位」</div>
+            </div>
+        </div>
+
+        <!-- 详情 -->
+        <div class="card" id="detailCard" style="display:none;">
+            <div class="card-head">
+                <h3 id="detailTitle">岗位详情</h3>
+                <div class="ops">
+                    <button class="btn-ghost" id="btnEdit">编辑</button>
+                    <button class="btn-danger" id="btnDelete">删除</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="k">岗位编码</div>
+                    <div class="v mono" id="dCode">-</div>
+                    <div class="k">岗位名称</div>
+                    <div class="v" id="dName">-</div>
+                    <div class="k">状态</div>
+                    <div class="v" id="dStatus">-</div>
+                    <div class="k">岗位说明</div>
+                    <div class="v" id="dDesc">-</div>
+                    <div class="k">成员人数</div>
+                    <div class="v" id="dCount">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 成员维护 -->
+        <div class="card" id="memberCard" style="display:none;">
+            <div class="card-head">
+                <h3>岗位成员</h3>
+            </div>
+            <div class="member-toolbar">
+                <input type="text" id="userKw" placeholder="搜索用户账号或姓名…">
+                <span class="hint">勾选即为该岗位成员；点成员右侧「主责」可设为主责（再点一次取消）</span>
+                <span class="spacer"></span>
+                <button class="btn-mini" id="btnSaveMembers" disabled>保存成员</button>
+            </div>
+            <div class="member-grid" id="memberGrid">
+                <div class="member-empty">加载中…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 新增/编辑岗位弹窗 ============ -->
+<div class="modal" id="formModal">
+    <div class="modal-box">
+        <h3 id="modalTitle">新增岗位</h3>
+        <div class="modal-body">
+            <div class="err-text" id="formErr"></div>
+            <div class="fld">
+                <label>岗位编码<span class="req">*</span></label>
+                <input type="text" id="fCode" placeholder="如 POS_DEPT_MANAGER" autocomplete="off">
+                <div class="tip">
+                    即流程设计器里「候选岗位」的值（flowable:candidateGroups）。只能用字母、数字、下划线。<br>
+                    修改编码不会自动改动已部署流程里的绑定，需重新部署流程才生效。
+                </div>
+            </div>
+            <div class="fld">
+                <label>岗位名称<span class="req">*</span></label>
+                <input type="text" id="fName" placeholder="如 部门经理" autocomplete="off">
+            </div>
+            <div class="fld">
+                <label>岗位说明</label>
+                <textarea id="fDesc" placeholder="这个岗位负责什么（可留空）"></textarea>
+            </div>
+            <div class="fld">
+                <label>状态</label>
+                <select id="fStatus">
+                    <option value="1">启用</option>
+                    <option value="0">停用</option>
+                </select>
+                <div class="tip">停用后，流程设计器的「候选岗位」下拉里不再出现该岗位。</div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button class="btn-ghost" id="btnCancelForm">取消</button>
+            <button class="btn-primary" id="btnSubmitForm">保存</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+<div th:replace="~{fragments/statusBar :: statusBar}"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ==================== 全局状态 ====================
+    let positions = [];          // 岗位列表
+    let current = null;          // 当前选中的岗位
+    let allUsers = [];           // 全部用户（候选池）
+    let memberUserIds = [];      // 当前岗位成员 userId
+    let primaryUserId = null;    // 当前岗位的主责 userId
+    let selectedUserIds = new Set(); // 成员勾选态（临时，未保存）
+    let dirty = false;           // 成员是否有未保存改动
+
+    const $ = id => document.getElementById(id);
+
+    // ==================== 轻提示 ====================
+    let toastTimer = null;
+    function toast(msg, type) {
+        const el = $('toast');
+        el.textContent = msg;
+        el.className = 'show ' + (type || '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { el.className = ''; }, 2200);
+    }
+
+    // ==================== 工具 ====================
+    function esc(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function getJson(url) {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+    }
+
+    async function postJson(url, body, method) {
+        const res = await fetch(url, {
+            method: method || 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: body === undefined ? undefined : JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+    }
+
+    // ==================== 岗位列表 ====================
+    async function loadPositions(keepSelection) {
+        const kw = $('kw').value.trim();
+        const url = '/position/rows' + (kw ? '?keyword=' + encodeURIComponent(kw) : '');
+        try {
+            positions = await getJson(url) || [];
+        } catch (e) {
+            positions = [];
+            toast('岗位列表加载失败：' + e.message, 'bad');
+        }
+        renderList();
+        if (keepSelection && current) {
+            const still = positions.filter(p => p.id === current.id)[0];
+            if (still) { selectPosition(still.id); }
+            else { clearSelection(); }
+        }
+    }
+
+    function renderList() {
+        const box = $('posList');
+        if (!positions.length) {
+            box.innerHTML = '<div class="empty-tip">没有匹配的岗位</div>';
+            return;
+        }
+        let html = '';
+        positions.forEach(p => {
+            const active = current && current.id === p.id ? ' active' : '';
+            const stTag = p.status === 1
+                ? '<span class="tag tag-on">启用</span>'
+                : '<span class="tag tag-off">停用</span>';
+            html += `
+            <div class="pos-item${active}" data-id="${esc(p.id)}">
+                <div class="line1">
+                    <span class="pname">${esc(p.name)}</span>
+                    <span>${stTag}<span class="tag" style="margin-left:4px;">${p.memberCount || 0} 人</span></span>
+                </div>
+                <div class="pcode">${esc(p.code)}</div>
+                ${p.description ? `<div class="pdesc" title="${esc(p.description)}">${esc(p.description)}</div>` : ''}
+            </div>`;
+        });
+        box.innerHTML = html;
+
+        box.querySelectorAll('.pos-item').forEach(el => {
+            el.onclick = () => selectPosition(el.dataset.id);
+        });
+    }
+
+    // ==================== 选中岗位 ====================
+    async function selectPosition(id) {
+        if (dirty && !confirm('成员改动尚未保存，确定要切换吗？')) return;
+
+        const p = positions.filter(x => x.id === id)[0];
+        if (!p) return;
+        current = p;
+        renderList();
+        renderDetail(p);
+
+        $('emptyCard').style.display = 'none';
+        $('detailCard').style.display = '';
+        $('memberCard').style.display = '';
+
+        await loadMembers(id);
+    }
+
+    function clearSelection() {
+        current = null;
+        dirty = false;
+        renderList();
+        $('emptyCard').style.display = '';
+        $('detailCard').style.display = 'none';
+        $('memberCard').style.display = 'none';
+    }
+
+    function renderDetail(p) {
+        $('detailTitle').textContent = p.name || '岗位详情';
+        $('dCode').textContent = p.code || '-';
+        $('dName').textContent = p.name || '-';
+        $('dDesc').textContent = p.description || '（未填写）';
+        $('dCount').textContent = (p.memberCount || 0) + ' 人';
+        $('dStatus').innerHTML = p.status === 1
+            ? '<span class="tag tag-on">启用</span>'
+            : '<span class="tag tag-off">停用</span>';
+    }
+
+    // ==================== 成员 ====================
+    async function loadMembers(positionId) {
+        const grid = $('memberGrid');
+        grid.innerHTML = '<div class="member-empty">加载中…</div>';
+        selectedUserIds = new Set();
+        primaryUserId = null;
+
+        try {
+            // 用户池只加载一次
+            if (!allUsers.length) {
+                allUsers = await getJson('/position/users') || [];
+            }
+            const mine = await getJson('/position/' + encodeURIComponent(positionId) + '/members') || [];
+            mine.forEach(u => {
+                selectedUserIds.add(u.userId);
+                if (u.isPrimary === 1) primaryUserId = u.userId;
+            });
+        } catch (e) {
+            grid.innerHTML = '<div class="member-empty">加载失败：' + esc(e.message) + '</div>';
+            return;
+        }
+
+        dirty = false;
+        updateSaveBtn();
+        renderMembers();
+    }
+
+    function renderMembers() {
+        const grid = $('memberGrid');
+        const kw = $('userKw').value.trim().toLowerCase();
+
+        if (!allUsers.length) {
+            grid.innerHTML = '<div class="member-empty">系统中没有可用用户</div>';
+            return;
+        }
+
+        const list = allUsers.filter(u => {
+            if (!kw) return true;
+            const name = (u.realName || '').toLowerCase();
+            const acc = (u.username || '').toLowerCase();
+            return name.indexOf(kw) >= 0 || acc.indexOf(kw) >= 0;
+        });
+
+        // 已勾选的人始终排前面，方便查看
+        list.sort((a, b) => {
+            const sa = selectedUserIds.has(a.userId) ? 0 : 1;
+            const sb = selectedUserIds.has(b.userId) ? 0 : 1;
+            if (sa !== sb) return sa - sb;
+            return (a.username || '').localeCompare(b.username || '');
+        });
+
+        if (!list.length) {
+            grid.innerHTML = '<div class="member-empty">没有匹配的用户</div>';
+            return;
+        }
+
+        let html = '';
+        list.forEach(u => {
+            const checked = selectedUserIds.has(u.userId);
+            const isPrimary = primaryUserId === u.userId && checked;
+            // 注意：这里不能用 <label> 包裹 checkbox —— label 的默认行为会让
+            // 双击（两次 click）翻转两次选中态，且 renderMembers 会重建 DOM 导致
+            // 第二次点击落到新元素上，用户会看到「双击后反而取消了勾选」。
+            // 因此改用 div + 显式绑定，主责用单选按钮切换，避免双击。
+            html += `
+            <div class="user-chip${checked ? ' checked' : ''}" data-uid="${u.userId}">
+                <input type="checkbox" ${checked ? 'checked' : ''} data-uid="${u.userId}" title="勾选为岗位成员">
+                <span class="u-text">
+                    <span class="u-name">${esc(u.realName || u.username)}</span>
+                    <span class="u-acc">${esc(u.username)}</span>
+                </span>
+                <span class="primary-pick${isPrimary ? ' on' : ''}${checked ? '' : ' disabled'}"
+                      data-uid="${u.userId}"
+                      title="${checked ? '设为本岗位主责' : '先勾选为成员才能设主责'}">
+                    <span class="primary-dot"></span>
+                    <span>主责</span>
+                </span>
+            </div>`;
+        });
+        grid.innerHTML = html;
+
+        // 勾选/取消成员
+        grid.querySelectorAll('input[type=checkbox]').forEach(cb => {
+            cb.onchange = () => toggleUser(parseInt(cb.dataset.uid, 10), cb.checked);
+        });
+
+        // 点「主责」标记：设为主责；再点同一人则取消
+        grid.querySelectorAll('.primary-pick').forEach(el => {
+            el.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const uid = parseInt(el.dataset.uid, 10);
+                if (!selectedUserIds.has(uid)) {
+                    toast('请先勾选该用户为岗位成员', 'bad');
+                    return;
+                }
+                primaryUserId = (primaryUserId === uid) ? null : uid;
+                dirty = true;
+                updateSaveBtn();
+                renderMembers();
+            };
+        });
+    }
+
+    function toggleUser(uid, checked) {
+        if (checked) {
+            selectedUserIds.add(uid);
+        } else {
+            selectedUserIds.delete(uid);
+            if (primaryUserId === uid) primaryUserId = null;
+        }
+        dirty = true;
+        updateSaveBtn();
+        renderMembers();
+    }
+
+    function updateSaveBtn() {
+        const btn = $('btnSaveMembers');
+        btn.disabled = !dirty;
+        btn.textContent = dirty ? '保存成员（未保存）' : '保存成员';
+    }
+
+    async function saveMembers() {
+        if (!current) return;
+        const btn = $('btnSaveMembers');
+        btn.disabled = true;
+        btn.textContent = '保存中…';
+        try {
+            const body = {
+                userIds: Array.from(selectedUserIds),
+                primaryId: primaryUserId
+            };
+            const r = await postJson('/position/' + encodeURIComponent(current.id) + '/members', body);
+            if (r && r.success) {
+                dirty = false;
+                toast('成员已保存', 'ok');
+                // 刷新左侧人数与详情人数
+                await loadPositions(true);
+            } else {
+                toast((r && r.message) || '保存失败', 'bad');
+                updateSaveBtn();
+            }
+        } catch (e) {
+            toast('保存失败：' + e.message, 'bad');
+            updateSaveBtn();
+        }
+    }
+
+    // ==================== 新增 / 编辑弹窗 ====================
+    let editingId = null;
+
+    function openForm(p) {
+        editingId = p ? p.id : null;
+        $('modalTitle').textContent = p ? '编辑岗位' : '新增岗位';
+        $('fCode').value = p ? (p.code || '') : '';
+        $('fName').value = p ? (p.name || '') : '';
+        $('fDesc').value = p ? (p.description || '') : '';
+        $('fStatus').value = p ? String(p.status === 0 ? 0 : 1) : '1';
+        hideFormErr();
+        $('formModal').classList.add('show');
+        setTimeout(() => $('fCode').focus(), 30);
+    }
+
+    function closeForm() {
+        $('formModal').classList.remove('show');
+    }
+
+    function showFormErr(msg) {
+        const el = $('formErr');
+        el.textContent = msg;
+        el.classList.add('show');
+    }
+
+    function hideFormErr() {
+        $('formErr').classList.remove('show');
+    }
+
+    async function submitForm() {
+        const code = $('fCode').value.trim();
+        const name = $('fName').value.trim();
+        if (!code) { showFormErr('请填写岗位编码'); return; }
+        if (!/^[A-Za-z0-9_]+$/.test(code)) { showFormErr('岗位编码只能包含字母、数字和下划线'); return; }
+        if (!name) { showFormErr('请填写岗位名称'); return; }
+
+        const btn = $('btnSubmitForm');
+        btn.disabled = true;
+        btn.textContent = '保存中…';
+        try {
+            const body = {
+                id: editingId || '',
+                code: code,
+                name: name,
+                description: $('fDesc').value.trim(),
+                status: parseInt($('fStatus').value, 10)
+            };
+            const r = await postJson('/position/save', body);
+            if (r && r.success) {
+                closeForm();
+                toast(editingId ? '岗位已更新' : '岗位已创建', 'ok');
+                const newId = r.data && r.data.id;
+                await loadPositions(false);
+                if (newId) selectPosition(newId);
+            } else {
+                showFormErr((r && r.message) || '保存失败');
+            }
+        } catch (e) {
+            showFormErr('保存失败：' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '保存';
+        }
+    }
+
+    // ==================== 删除 ====================
+    async function deletePosition() {
+        if (!current) return;
+        if (!confirm('确定删除岗位「' + current.name + '」吗？\n\n' +
+            '该岗位的成员关系会一并删除。已部署流程中引用此编码的节点将不再匹配到任何人。')) {
+            return;
+        }
+        try {
+            const r = await postJson('/position/' + encodeURIComponent(current.id), undefined, 'DELETE');
+            if (r && r.success) {
+                toast('岗位已删除', 'ok');
+                clearSelection();
+                await loadPositions(false);
+            } else {
+                toast((r && r.message) || '删除失败', 'bad');
+            }
+        } catch (e) {
+            toast('删除失败：' + e.message, 'bad');
+        }
+    }
+
+    // ==================== 事件绑定 ====================
+    $('btnNew').onclick = () => openForm(null);
+    $('btnEdit').onclick = () => { if (current) openForm(current); };
+    $('btnDelete').onclick = deletePosition;
+    $('btnCancelForm').onclick = closeForm;
+    $('btnSubmitForm').onclick = submitForm;
+    $('btnSaveMembers').onclick = saveMembers;
+
+    // 筛选：输入即过滤（本地过滤，不打后端，避免抖动）
+    let kwTimer = null;
+    $('kw').oninput = function () {
+        clearTimeout(kwTimer);
+        kwTimer = setTimeout(() => {
+            const kw = $('kw').value.trim().toLowerCase();
+            const filtered = !kw ? positions : positions.filter(p =>
+                (p.code || '').toLowerCase().indexOf(kw) >= 0 ||
+                (p.name || '').toLowerCase().indexOf(kw) >= 0);
+            // 仅重绘，不影响 current
+            const box = $('posList');
+            if (!filtered.length) {
+                box.innerHTML = '<div class="empty-tip">没有匹配的岗位</div>';
+                return;
+            }
+            let html = '';
+            filtered.forEach(p => {
+                const active = current && current.id === p.id ? ' active' : '';
+                const stTag = p.status === 1
+                    ? '<span class="tag tag-on">启用</span>'
+                    : '<span class="tag tag-off">停用</span>';
+                html += `
+                <div class="pos-item${active}" data-id="${esc(p.id)}">
+                    <div class="line1">
+                        <span class="pname">${esc(p.name)}</span>
+                        <span>${stTag}<span class="tag" style="margin-left:4px;">${p.memberCount || 0} 人</span></span>
+                    </div>
+                    <div class="pcode">${esc(p.code)}</div>
+                    ${p.description ? `<div class="pdesc" title="${esc(p.description)}">${esc(p.description)}</div>` : ''}
+                </div>`;
+            });
+            box.innerHTML = html;
+            box.querySelectorAll('.pos-item').forEach(el => {
+                el.onclick = () => selectPosition(el.dataset.id);
+            });
+        }, 120);
+    };
+
+    $('userKw').oninput = function () { renderMembers(); };
+
+    $('btnSyncGroup').onclick = async function () {
+        const btn = this;
+        const old = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '同步中…';
+        try {
+            const res = await fetch('/position/sync');
+            const text = await res.text();
+            toast(text, text.indexOf('失败') >= 0 ? 'bad' : 'ok');
+        } catch (e) {
+            toast('同步失败：' + e.message, 'bad');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = old;
+        }
+    };
+
+    // 弹窗点击遮罩关闭
+    $('formModal').addEventListener('click', function (e) {
+        if (e.target === this) closeForm();
+    });
+
+    // ESC 关闭弹窗
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && $('formModal').classList.contains('show')) closeForm();
+    });
+
+    // 离开页面前提醒未保存的成员改动
+    window.addEventListener('beforeunload', function (e) {
+        if (dirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // ==================== 启动 ====================
+    loadPositions(false);
+})();
+</script>
+</body>
+</html>

@@ -66,13 +66,16 @@ public class PageController {
         // 1.查询代办总数
         TaskQuery countQuery = taskService.createTaskQuery();
         if (finalAssignee != null && finalAssignee.trim().length() > 0) {
-            countQuery.taskAssignee(finalAssignee.trim());
+            // 关键：用 taskCandidateOrAssigned 而不是 taskAssignee
+            // 候选组任务（candidateGroups）在认领前 assignee 为空，
+            // 只查 taskAssignee 会漏掉"岗位待办"，组内成员看不到分给岗位的任务
+            countQuery.taskCandidateOrAssigned(finalAssignee.trim());
         }
         long total = countQuery.count();
 
         TaskQuery taskQuery = taskService.createTaskQuery();
         if(finalAssignee != null && finalAssignee.trim().length()>0){
-            taskQuery.taskAssignee(finalAssignee.trim());
+            taskQuery.taskCandidateOrAssigned(finalAssignee.trim());
         }
 
         // 动态排序
@@ -107,6 +110,8 @@ public class PageController {
             map.put("taskName", t.getName());
             map.put("processInstanceId", t.getProcessInstanceId());
             map.put("assignee", t.getAssignee());
+            // assignee 为空 = 候选组任务（岗位待办），需要先认领
+            map.put("unclaimed", t.getAssignee() == null || t.getAssignee().isBlank());
             map.put("createTime", t.getCreateTime());
             resultList.add(map);
         }
@@ -229,8 +234,28 @@ public class PageController {
 
     //=======新增：任务办理表单页面=======
     @GetMapping("/toAudit")
-    public ModelAndView toAuditPage(@RequestParam String taskId, Model model) {
+    public ModelAndView toAuditPage(@RequestParam String taskId,
+                                    Model model,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        if (task == null) {
+            redirectAttributes.addFlashAttribute("msg", "该任务不存在或已被他人处理！");
+            return new ModelAndView("redirect:/todoTask/toPage");
+        }
+        // 候选组任务：进入办理页时自动签收给当前登录用户
+        // 签收后如果又被别人抢先，claim 会抛异常，这里捕获后提示
+        String loginUser = (String) session.getAttribute("loginUser");
+        if (task.getAssignee() == null && loginUser != null) {
+            try {
+                taskService.claim(taskId, loginUser);
+                task = taskService.createTaskQuery().taskId(taskId).singleResult();
+            } catch (Exception e) {
+                log.warn("任务签收失败，可能已被他人认领，taskId:{}", taskId, e);
+                redirectAttributes.addFlashAttribute("msg", "该任务已被其他人领取，请刷新待办列表");
+                return new ModelAndView("redirect:/todoTask/toPage");
+            }
+        }
         model.addAttribute("task", task);
         return new ModelAndView("auditTask");
     }
@@ -240,6 +265,7 @@ public class PageController {
     public String doAudit(@RequestParam String taskId,
                           @RequestParam String auditResult,
                           @RequestParam String auditComment,
+                          HttpSession session,
                           RedirectAttributes redirectAttributes) {
         // 查询当前任务
         Task task = taskService.createTaskQuery()
@@ -248,6 +274,16 @@ public class PageController {
         if (task == null) {
             redirectAttributes.addFlashAttribute("msg", "该任务不存在或已审批完成！");
             return "redirect:/todoTask/toPage";
+        }
+        // 兜底：未经办理页直接提交时，先把任务签收给当前用户，否则组任务无法 complete
+        String loginUser = (String) session.getAttribute("loginUser");
+        if (task.getAssignee() == null && loginUser != null) {
+            try {
+                taskService.claim(taskId, loginUser);
+            } catch (Exception e) {
+                redirectAttributes.addFlashAttribute("msg", "该任务已被其他人领取！");
+                return "redirect:/todoTask/toPage";
+            }
         }
 
         Map<String, Object> vars = new HashMap<>();
@@ -258,14 +294,25 @@ public class PageController {
         return "redirect:/home/index";
     }
 
-    //=======新增：领取（签收）任务claim=======
+    //=======领取（签收）任务claim：默认签收给当前登录用户=======
     @GetMapping("/claimTask")
     public String claimTask(@RequestParam String taskId,
-                            @RequestParam String username,
+                            @RequestParam(required = false) String username,
+                            HttpSession session,
                             RedirectAttributes redirectAttributes) {
-        //签收，把任务分配给自己
-        taskService.claim(taskId, username);
-        redirectAttributes.addFlashAttribute("msg", "任务领取成功");
+        String loginUser = (String) session.getAttribute("loginUser");
+        String target = (username != null && !username.isBlank()) ? username : loginUser;
+        if (target == null) {
+            redirectAttributes.addFlashAttribute("msg", "请先登录");
+            return "redirect:/login/toPage";
+        }
+        try {
+            taskService.claim(taskId, target);
+            redirectAttributes.addFlashAttribute("msg", "任务领取成功");
+        } catch (Exception e) {
+            log.warn("任务领取失败, taskId:{}", taskId, e);
+            redirectAttributes.addFlashAttribute("msg", "该任务已被其他人领取");
+        }
         return "redirect:/home/index";
     }
 }

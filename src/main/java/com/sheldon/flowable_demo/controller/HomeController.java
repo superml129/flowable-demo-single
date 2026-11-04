@@ -41,9 +41,9 @@ public class HomeController {
         String loginUser = (String) session.getAttribute("loginUser");
 
         int firstResult = (pageNum -1)*pageSize;
-        //查询当前用户代办总数
+        //查询当前用户代办总数（taskCandidateOrAssigned：既包含直接分给我的，也包含我所在岗位的候选任务）
         TaskQuery taskQuery = taskService.createTaskQuery()
-                .taskAssignee(loginUser);
+                .taskCandidateOrAssigned(loginUser);
         long todoTotal = taskQuery.count();
 
         // 动态排序

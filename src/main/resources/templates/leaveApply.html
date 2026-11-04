@@ -28,8 +28,14 @@
       <textarea name="leaveReason" rows="4" required placeholder="填写请假事由"></textarea>
     </div>
     <div class="form-item">
-      <label>审批经理账号：</label>
-      <input type="text" name="manager" required placeholder="填写经理账号，例如 zhangsan">
+      <label>审批岗位：</label>
+      <select name="approvePosition">
+        <option value="POS_DEPT_MANAGER">部门经理（POS_DEPT_MANAGER）</option>
+        <option value="POS_GM_OFFICE">总经理办公室（POS_GM_OFFICE）</option>
+      </select>
+      <div class="form-tip" style="color:#888;font-size:12px;">
+        流程节点绑定的是岗位，岗位内所有人都会在待办中看到该任务，先认领者办理。
+      </div>
     </div>
     <div class="btn-row">
       <button type="submit" class="search-btn">提交申请</button>

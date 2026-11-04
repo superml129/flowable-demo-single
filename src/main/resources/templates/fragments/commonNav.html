@@ -4,21 +4,55 @@
 <head>
     <meta charset="UTF-8">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%232b5797'/><path d='M20 22h24v6H20zM20 32h16v6H20zM20 42h24v6H20z' fill='white'/></svg>">
-
 </head>
 <body>
 <!-- 定义片段名称：navBar -->
 <div th:fragment="navBar">
+    <!--
+      说明：本文件是 th:fragment 片段，th:replace="~{fragments/commonNav :: navBar}"
+      只搬运 <div th:fragment="navBar"> 内部内容，<head> 里的 <style> 不会随片段
+      插入调用页面。顶部图标曾因此失去尺寸约束，被 SVG 默认尺寸（300×150）撑得
+      巨大。故此处把尺寸直接写在每个 <svg> 的 width/height 属性上，任何页面引入
+      都成立；hover 变色由下方片段内的 <style> 负责（同样随片段生效）。
+    -->
+    <style>
+        .nav-box a{ display:inline-flex; align-items:center; gap:6px; }
+        .nav-box svg.ni{ width:16px; height:16px; flex-shrink:0; color:#ffffff; transition:color .15s; }
+        .nav-box a:hover svg.ni{ color:#ffd166; }
+    </style>
     <h3>Flowable‑6.8.0 通用审批系统</h3>
     <!--顶部导航栏-->
     <div class="nav-box">
-        <a th:href="@{/home/index}">🏠首页</a>
-        <a th:href="@{/leaveApply/toPage}">📝提交申请</a>
-        <a th:href="@{/todoTask/toPage(assignee=${session.loginUser})}">✅代办任务查询</a>
-        <a th:href="@{/todoTask/donePage(assignee=${session.loginUser})}">📋已办任务查询</a>
+        <a th:href="@{/home/index}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
+            首页
+        </a>
+        <a th:href="@{/leaveApply/toPage}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            提交申请
+        </a>
+        <a th:href="@{/todoTask/toPage(assignee=${session.loginUser})}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            代办任务查询
+        </a>
+        <a th:href="@{/todoTask/donePage(assignee=${session.loginUser})}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+            已办任务查询
+        </a>
+        <a th:href="@{/position/page}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            岗位管理
+        </a>
+        <a th:href="@{/user/page}">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            成员管理
+        </a>
         <span class="user-text">当前登录用户：<span th:text="${loginUser}"></span></span>
         <!--退出登录按钮-->
-        <a th:href="@{/login/logout}" style="color:white;margin-left:15px;">🚪退出登录</a>
+        <a th:href="@{/login/logout}" style="color:white;margin-left:15px;">
+            <svg class="ni" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            退出登录
+        </a>
     </div>
 </div>
 </body>

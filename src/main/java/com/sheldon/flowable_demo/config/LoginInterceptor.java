@@ -30,6 +30,9 @@ public class LoginInterceptor implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 // 静态资源放行，避免 session 过期时 vendor 下的 js/css 被 302 成登录页
                 .excludePathPatterns("/login/**", "/css/**", "/captcha",
-                        "/vendor/**", "/static/**", "/favicon.svg", "/error");
+                        "/vendor/**", "/static/**", "/favicon.svg", "/error",
+                        // 岗位字典只含编码与名称，供设计器「候选岗位」下拉使用。
+                        // 只放行这一个只读接口，岗位管理页与写接口仍要求登录。
+                        "/position/list");
     }
 }

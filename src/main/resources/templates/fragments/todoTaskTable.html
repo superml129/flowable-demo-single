@@ -69,7 +69,7 @@
             <td th:text="${item.taskId}"></td>
             <td th:text="${item.taskName}"></td>
             <td th:text="${item.processInstanceId}"></td>
-            <td th:if="${sAdmin}" th:text="${item.assignee}"></td>
+            <td th:if="${sAdmin}" th:text="${item.assignee} ?: '（岗位待办）'"></td>
             <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
             <td>
                 <a class="btn-edit" th:href="@{/todoTask/toAudit(taskId=${item.taskId})}">办理</a>

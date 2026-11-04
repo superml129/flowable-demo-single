@@ -42,12 +42,35 @@
         }
         .xml-error{color:#c00;padding:6px 12px;background:#ffe9e9;display:none;font-size:13px;}
         #canvas{flex:1;height:100%;min-width:0;}
-        #properties-panel{width:24%;min-width:220px;overflow:auto;border-left:1px solid #ddd;}
+        /* 右侧列：岗位分配区块 + 属性面板 */
+        .right-col{
+            width:24%;min-width:220px;height:100%;
+            display:flex;flex-direction:column;
+            border-left:1px solid #ddd;background:#fff;
+        }
+        #properties-panel{flex:1;min-height:0;overflow:auto;width:100%;}
+
+        /* 岗位分配区块 */
+        #positionPanel{display:none;border-bottom:1px solid #ddd;background:#fafbfc;flex-shrink:0;}
+        #positionPanel .pp-title{
+            padding:8px 12px;background:#eef1f4;font-size:13px;font-weight:bold;
+            color:#33475b;border-bottom:1px solid #e2e6ea;
+        }
+        #positionPanel .pp-row{padding:10px 12px 6px;display:flex;flex-direction:column;gap:6px;}
+        #positionPanel .pp-label{font-size:12px;color:#555;}
+        #positionSelect{
+            width:100%;padding:5px 6px;font-size:12px;
+            border:1px solid #c9ced4;border-radius:3px;background:#fff;color:#222;
+        }
+        #positionSelect:focus{outline:none;border-color:#3490dc;box-shadow:0 0 0 2px rgba(52,144,220,.15);}
+        #positionPanel .pp-desc{
+            padding:0 12px 10px;font-size:11px;line-height:1.6;color:#7a828a;word-break:break-all;
+        }
 
         /* 属性面板折叠开关（画布与面板之间的竖条） */
         .panel-toggle{
             width:12px;height:100%;cursor:pointer;
-            background:#f5f5f5;border-left:1px solid #ddd;
+            background:#f5f5f5;
             display:flex;align-items:center;justify-content:center;
             user-select:none;flex-shrink:0;
         }
@@ -56,8 +79,8 @@
             font-size:10px;color:#666;
             transition:transform 0.2s;
         }
-        /* 收起状态：面板隐藏，箭头反向 */
-        .main-wrap.panel-collapsed #properties-panel{display:none;}
+        /* 收起状态：右侧列隐藏，箭头反向 */
+        .main-wrap.panel-collapsed .right-col{display:none;}
         .main-wrap.panel-collapsed .panel-toggle .arrow{transform:rotate(180deg);}
 
         /* 弹窗样式 */
@@ -95,6 +118,7 @@
         <button id="btnImport">导入XML</button>
         <button id="btnLoadDeploy">加载已有流程</button>
         <button id="btnGetXml">获取BPMN XML</button>
+        <button id="btnSaveLocal">保存到本地</button>
         <button id="btnDeploy">部署到Flowable</button>
         <input type="file" id="fileInput" accept=".xml,.bpmn" style="display:none">
     </div>
@@ -116,9 +140,22 @@
         <div class="panel-toggle" id="panelToggle" title="展开/收起属性面板">
             <span class="arrow">▶</span>
         </div>
-        <div id="properties-panel"></div>
+        <div class="right-col">
+            <!-- 岗位分配区块：选中 userTask 时显示（属性面板 UMD 未暴露组件工厂，故独立承载） -->
+            <div id="positionPanel">
+                <div class="pp-title">岗位分配</div>
+                <div class="pp-row">
+                    <label class="pp-label" for="positionSelect">候选岗位</label>
+                    <select id="positionSelect"></select>
+                </div>
+                <div class="pp-desc" id="positionDesc"></div>
+                <input type="hidden" id="positionCurrent"/>
+            </div>
+            <div id="properties-panel"></div>
+        </div>
     </div>
 </div>
+<!-- /container -->
 
 <!-- 选择部署弹窗 -->
 <div class="modal" id="deployModal">
@@ -166,6 +203,109 @@
     let cmEditor = null;
     let isSyncing = false; // 互斥锁，防止循环刷新
     let xmlDebounceTimer = null;
+    let currentFileName = null; // 当前 XML 对应的本地文件名（保存时用）
+
+    // ========== 自定义属性面板：候选岗位 ==========
+    // 说明：属性面板 UMD（1.20）只对外暴露 useService，未暴露 Group / TextFieldEntry / SelectEntry
+    // 等组件工厂，第三方无法在页面里声明式地插入自定义分组（需引入 preact 打包流程）。
+    // 因此这里采用"面板外层承载"的方式：在属性面板容器上方渲染一个独立区块，
+    // 通过 selection.changed 与画布选中元素联动，写回 flowable:candidateGroups。
+    // 优点：不依赖面板内部实现，升级面板版本不会失效。
+    const POSITION_CODE_HINT = '选择岗位后，组内所有人可在待办中看到该任务，先认领者办理。';
+
+    function createPositionProvider() {
+        const wrap = document.getElementById('positionPanel');
+        const selectEl = document.getElementById('positionSelect');
+        const descEl = document.getElementById('positionDesc');
+        const currentEl = document.getElementById('positionCurrent');
+        if (!wrap || !selectEl) return;
+
+        let currentElement = null;
+        let positionsLoaded = false;
+        let pendingValue = '';   // 选项还没就绪时暂存待回填的值
+        let optionsReady = false;
+
+        function renderOptions(list) {
+            const cur = pendingValue || '';
+            selectEl.innerHTML = '<option value="">（未指定：直接分派给办理人）</option>';
+            list.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.code;
+                opt.textContent = p.name + '（' + p.code + '）';
+                selectEl.appendChild(opt);
+            });
+            // 若当前值不在列表里（比如手工填的），补一个选项以免丢失
+            if (cur && !list.some(p => p.code === cur)) {
+                const opt = document.createElement('option');
+                opt.value = cur;
+                opt.textContent = cur + '（未登记岗位）';
+                selectEl.appendChild(opt);
+            }
+            optionsReady = true;
+            selectEl.value = cur;
+        }
+
+        // 从后端加载岗位列表（/position/list，失败则用内置兜底）
+        function loadPositions() {
+            if (positionsLoaded) return;
+            positionsLoaded = true;
+            fetch('/position/list')
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                .then(list => renderOptions(list || []))
+                .catch(() => renderOptions([
+                    { code: 'POS_DEPT_MANAGER', name: '部门经理' },
+                    { code: 'POS_GM_OFFICE', name: '总经理办公室' }
+                ]));
+        }
+
+        function readValue(element) {
+            return element.businessObject.get('flowable:candidateGroups') || '';
+        }
+
+        function applyValue(value) {
+            if (!currentElement || !bpmnModeler) return;
+            bpmnModeler.get('modeling').updateProperties(currentElement, {
+                'flowable:candidateGroups': value ? value : undefined
+            });
+        }
+
+        // 选中元素变化时刷新区块
+        function refresh(element) {
+            currentElement = element;
+            const bo = element && element.businessObject;
+            if (!bo || bo.$type !== 'bpmn:UserTask') {
+                wrap.style.display = 'none';
+                return;
+            }
+            wrap.style.display = 'block';
+            loadPositions();
+            const val = readValue(element);
+            pendingValue = val;
+            if (currentEl) currentEl.value = val;
+            if (descEl) {
+                descEl.textContent = val ? ('当前绑定：' + val + '。' + POSITION_CODE_HINT) : POSITION_CODE_HINT;
+            }
+            // 选项已就绪才写 value，否则等 renderOptions 回调时按 pendingValue 回填
+            if (optionsReady) selectEl.value = val;
+        }
+
+        selectEl.onchange = function () {
+            applyValue(selectEl.value);
+        };
+
+        bpmnModeler.on('selection.changed', function (e) {
+            refresh((e.newSelection && e.newSelection[0]) || null);
+        });
+        // 画布根节点变化（导入 XML 后）也要刷新一次
+        bpmnModeler.on('root.set', function () {
+            refresh(null);
+        });
+
+        // 供外部（commandStack.changed / 撤销重做）回填下拉框当前值
+        return {
+            refresh: function () { refresh(currentElement); }
+        };
+    }
 
     // 初始化codemirror xml高亮编辑器
     cmEditor = CodeMirror.fromTextArea(document.getElementById('xmlEditor'), {
@@ -197,6 +337,16 @@
         document.getElementById('canvas').innerHTML =
             '<div style="padding:24px;color:#c00;font-family:monospace;">编辑器初始化失败：' +
             (e && e.message) + '</div>';
+    }
+
+    // 初始化「岗位分配」区块（选中 UserTask 时显示）
+    let positionCtl = null;
+    if (bpmnModeler) {
+        try {
+            positionCtl = createPositionProvider();
+        } catch (e) {
+            console.error('岗位选择区块初始化失败', e);
+        }
     }
 
     // 加载xml到画布
@@ -406,6 +556,10 @@
         // setValue 会清空所有 mark，重新按当前选中元素打高亮
         const selected = bpmnModeler.get('selection').get()[0] || null;
         highlightXmlForElement(selected);
+        // 属性可能被画布/属性面板/撤销重做改动，回填岗位下拉框
+        if (positionCtl) {
+            try { positionCtl.refresh(); } catch (e) { /* 忽略 */ }
+        }
         setTimeout(() => isSyncing = false, 100);
     });
 
@@ -433,6 +587,7 @@
         const reader = new FileReader();
         reader.onload = async (ev)=>{
             const xmlStr = ev.target.result;
+            currentFileName = file.name; // 记住来源文件，保存时默认写回它
             cmEditor.setValue(xmlStr);
             await loadXmlToCanvas(xmlStr);
         };
@@ -470,6 +625,22 @@
             })
     };
 
+    // 保存当前 XML 到本地原始文件（processes 目录）
+    document.getElementById('btnSaveLocal').onclick = async ()=>{
+        const { xml } = await bpmnModeler.saveXML({ format: true });
+        const defaultName = currentFileName || 'leaveProcess.bpmn20.xml';
+        const fileName = prompt("保存为 processes 目录下的文件名：", defaultName);
+        if(!fileName) return;
+        const res = await fetch("/flow/saveLocal",{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body:JSON.stringify({ fileName: fileName, bpmnXml: xml })
+        });
+        const ret = await res.text();
+        alert(ret);
+        if(ret.startsWith("保存成功")) currentFileName = fileName;
+    };
+
     // ========== 加载已有流程逻辑 ==========
     const modal = document.getElementById('deployModal');
     const deploySelect = document.getElementById('deploySelect');
@@ -502,6 +673,9 @@
         }
         cmEditor.setValue(xml);
         await loadXmlToCanvas(xml);
+        // 以部署名作为默认保存文件名
+        const opt = deploySelect.options[deploySelect.selectedIndex];
+        currentFileName = opt ? opt.innerText.split(" (")[0] + ".bpmn20.xml" : null;
         modal.style.display = "none";
     };
 
