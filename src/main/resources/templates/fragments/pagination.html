@@ -23,7 +23,10 @@
 
   <script th:inline="javascript">
     /*<![CDATA[*/
-    const pagerUrl = /*[[${url}]]*/ '';
+    // pagerUrl 由后端以 "/todoTask/toPage" 这类根路径形式传入，
+    // 部署在子路径（/apps/flowable）时必须补上上下文前缀
+    const pagerUrlRaw = /*[[${url}]]*/ '';
+    const pagerUrl = window.ctxUrl ? ctxUrl(pagerUrlRaw) : pagerUrlRaw;
     const pagerSortField = /*[[${sortField}]]*/ '';
     const pagerSortOrder = /*[[${sortOrder}]]*/ '';
 
@@ -47,6 +50,7 @@
         if (sf) href += '&sortField=' + encodeURIComponent(sf);
         if (so) href += '&sortOrder=' + encodeURIComponent(so);
         if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
+        // pagerUrl 已带上下文前缀，这里的 href 直接跳转即可
         window.location.href = href;
       }
     }

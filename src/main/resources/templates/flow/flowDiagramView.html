@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
 <head>
     <meta charset="UTF-8">
     <title>流程实例查看（高亮）</title>
@@ -53,6 +53,7 @@
             animation: blinkActive 0.8s infinite;
         }
     </style>
+<script th:src="@{/js/ctx.js}"></script>
 </head>
 <body>
 <div class="toolbar">

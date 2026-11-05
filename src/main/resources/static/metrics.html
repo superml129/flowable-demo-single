@@ -68,8 +68,12 @@
         return Number.isInteger(v) ? v : v.toFixed(2);
     }
 
+    // 本页是静态文件，由 nginx 直接托管；用当前页面路径推算上下文前缀，
+    // 从而同时兼容根路径部署与 /apps/flowable 子路径部署
+    const CTX = location.pathname.replace(/\/metrics\.html$/, '');
+
     function fetchMetric(m){
-        return fetch('/actuator/metrics/' + m.name)
+        return fetch(CTX + '/actuator/metrics/' + m.name)
             .then(r => r.ok ? r.json() : null)
             .catch(() => null);
     }

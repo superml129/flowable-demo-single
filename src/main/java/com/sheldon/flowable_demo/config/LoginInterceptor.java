@@ -21,7 +21,8 @@ public class LoginInterceptor implements WebMvcConfigurer {
                     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
                         Object loginUser = request.getSession().getAttribute("loginUser");
                         if (loginUser == null) {
-                            response.sendRedirect("/login/toPage");
+                            // 必须拼上 contextPath，否则部署在 /apps/flowable 等子路径下会被跳到域名根
+                            response.sendRedirect(request.getContextPath() + "/login/toPage");
                             return false;
                         }
                         return true;
@@ -29,8 +30,8 @@ public class LoginInterceptor implements WebMvcConfigurer {
                 })
                 .addPathPatterns("/**")
                 // 静态资源放行，避免 session 过期时 vendor 下的 js/css 被 302 成登录页
-                .excludePathPatterns("/login/**", "/css/**", "/captcha",
-                        "/vendor/**", "/static/**", "/favicon.svg", "/error",
+                .excludePathPatterns("/login/**", "/css/**", "/js/**", "/captcha",
+                        "/vendor/**", "/static/**", "/favicon.svg", "/metrics.html", "/error",
                         // 岗位字典只含编码与名称，供设计器「候选岗位」下拉使用。
                         // 只放行这一个只读接口，岗位管理页与写接口仍要求登录。
                         "/position/list");

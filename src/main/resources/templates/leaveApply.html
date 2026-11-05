@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
 <head>
   <meta charset="UTF-8">
   <title>提交申请</title>
   <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+<script th:src="@{/js/ctx.js}"></script>
 </head>
 <div th:replace="~{fragments/commonNav :: navBar}"></div>
 <body>

@@ -136,7 +136,8 @@
                 if (sortField) href += '&sortField=' + encodeURIComponent(sortField);
                 if (sortOrder) href += '&sortOrder=' + encodeURIComponent(sortOrder);
                 if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
-                window.location.href = href;
+                // tablePageUrl() 是后端渲染的根路径（如 /todoTask/toPage），子路径部署需补前缀
+                window.location.href = window.ctxUrl ? ctxUrl(href) : href;
             };
         }
 

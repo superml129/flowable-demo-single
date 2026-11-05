@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
 <head>
     <meta charset="UTF-8">
     <title>已办任务列表</title>
     <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+<script th:src="@{/js/ctx.js}"></script>
 </head>
 <body>
 <div th:replace="~{fragments/commonNav :: navBar}"></div>

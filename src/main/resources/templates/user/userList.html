@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
 <head>
     <meta charset="UTF-8">
     <title>成员管理</title>
@@ -185,6 +185,7 @@
         #toast.ok{background:#1f8a4c;}
         #toast.bad{background:#c0392b;}
     </style>
+<script th:src="@{/js/ctx.js}"></script>
 </head>
 <body>
 

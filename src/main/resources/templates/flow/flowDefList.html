@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
 <head>
     <meta charset="UTF-8">
     <title>流程定义列表</title>
@@ -67,6 +67,7 @@
             background: rgba(255,255,255,0.55);
         }
     </style>
+<script th:src="@{/js/ctx.js}"></script>
 </head>
 <body>
 <div class="toolbar">
@@ -110,7 +111,7 @@
                 <td title="${item.id}">${item.id}</td>
                 <td title="${item.resourceName}">${item.resourceName}</td>
                 <td>
-                    <a class="btn btn-view" target="_blank" href="/flowDef/view?processDefinitionId=${item.id}">查看流程图</a>
+                    <a class="btn btn-view" target="_blank" href="${(window.ctxUrl ? ctxUrl('/flowDef/view') : '/flowDef/view')}?processDefinitionId=${item.id}">查看流程图</a>
                 </td>
             </tr>
             `
