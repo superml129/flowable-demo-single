@@ -3,16 +3,22 @@
   <process id="leaveProcess" name="请假申请流程" isExecutable="true">
     <startEvent id="startEvent1" />
     <userTask id="managerAudit" name="部门经理审批" flowable:candidateGroups="POS_DEPT_MANAGER">
+      <incoming>Flow_1aaouzg</incoming>
       <outgoing>Flow_0gzs0ko</outgoing>
     </userTask>
     <endEvent id="endEvent1" />
-    <sequenceFlow id="flow1" sourceRef="startEvent1" targetRef="managerAudit" />
+    <sequenceFlow id="flow1" sourceRef="startEvent1" targetRef="Activity_1b4opc7" />
     <sequenceFlow id="flow2" sourceRef="generalManagerAudit" targetRef="endEvent1" />
     <sequenceFlow id="Flow_0gzs0ko" sourceRef="managerAudit" targetRef="generalManagerAudit" />
     <userTask id="generalManagerAudit" name="总经理审批" flowable:candidateGroups="POS_GM_OFFICE">
       <incoming>Flow_0gzs0ko</incoming>
       <outgoing>flow2</outgoing>
     </userTask>
+    <userTask id="Activity_1b4opc7" name="发起申请" flowable:candidateGroups="POS_DEPT">
+      <incoming>flow1</incoming>
+      <outgoing>Flow_1aaouzg</outgoing>
+    </userTask>
+    <sequenceFlow id="Flow_1aaouzg" sourceRef="Activity_1b4opc7" targetRef="managerAudit" />
   </process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="leaveProcess">
@@ -20,26 +26,34 @@
         <omgdc:Bounds x="150" y="120" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_1_shape" bpmnElement="managerAudit">
-        <omgdc:Bounds x="280" y="100" width="100" height="80" />
+        <omgdc:Bounds x="290" y="250" width="100" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_shape" bpmnElement="endEvent1">
-        <omgdc:Bounds x="472" y="262" width="36" height="36" />
+        <omgdc:Bounds x="482" y="422" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_1svtir8_di" bpmnElement="generalManagerAudit">
-        <omgdc:Bounds x="280" y="240" width="100" height="80" />
+        <omgdc:Bounds x="450" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1b4opc7_di" bpmnElement="Activity_1b4opc7">
+        <omgdc:Bounds x="290" y="98" width="100" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="flow1_di" bpmnElement="flow1">
         <omgdi:waypoint x="186" y="138" />
-        <omgdi:waypoint x="280" y="138" />
+        <omgdi:waypoint x="290" y="138" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="flow2_di" bpmnElement="flow2">
-        <omgdi:waypoint x="380" y="280" />
-        <omgdi:waypoint x="472" y="280" />
+        <omgdi:waypoint x="500" y="330" />
+        <omgdi:waypoint x="500" y="422" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0gzs0ko_di" bpmnElement="Flow_0gzs0ko">
-        <omgdi:waypoint x="330" y="180" />
-        <omgdi:waypoint x="330" y="240" />
+        <omgdi:waypoint x="390" y="290" />
+        <omgdi:waypoint x="450" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1aaouzg_di" bpmnElement="Flow_1aaouzg">
+        <omgdi:waypoint x="340" y="178" />
+        <omgdi:waypoint x="340" y="250" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

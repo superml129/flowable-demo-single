@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!-- ============================================
+     审批履历表格片段（公共组件，与具体流程无关）
+     用法（任意页面）：
+       1. 页面需引入样式：<link rel="stylesheet" th:href="@{/css/leaveFlow.css}">
+       2. 引入片段：<div th:replace="~{fragments/approvalHistory :: historyTable(${records})}"></div>
+     参数 records：List<ApprovalHistoryService.ApprovalRecord>
+       （由 ApprovalHistoryService.listFinishedRecords(processInstanceId) 产生，
+        字段 name/assignee/result/comment/endTime，按完成时间倒序）
+     列表为空（如流程刚发起、无已完成节点）时整块不渲染。
+     结论徽标：通过=绿 / 驳回=红 / 提交=蓝 / 无记录=灰
+     ============================================ -->
+<th:block th:fragment="historyTable(records)">
+  <div th:if="${records != null and !#lists.isEmpty(records)}" class="lf-history">
+    <div class="lf-history-title">审批履历（按时间倒序）</div>
+    <table>
+      <thead>
+        <tr>
+          <th>审批节点</th>
+          <th>办理人</th>
+          <th>结论</th>
+          <th style="text-align:left;">审批意见</th>
+          <th>完成时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="h : ${records}">
+          <td th:text="${h.name}"></td>
+          <td th:text="${h.assignee}"></td>
+          <td>
+            <span th:if="${h.result == '通过'}" class="lf-badge pass">通过</span>
+            <span th:if="${h.result == '驳回'}" class="lf-badge reject">驳回</span>
+            <span th:if="${h.result == '提交'}" class="lf-badge submit">提交</span>
+            <span th:if="${h.result == null || h.result == ''}" class="lf-badge none">—</span>
+          </td>
+          <td style="text-align:left;max-width:280px;" th:text="${h.comment}"></td>
+          <td th:text="${#dates.format(h.endTime, 'yyyy-MM-dd HH:mm')}"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</th:block>
+</html>

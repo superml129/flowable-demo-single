@@ -55,6 +55,9 @@
             <td th:text="${#dates.format(item.createTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
             <td th:text="${#dates.format(item.endTime, 'yyyy-MM-dd HH:mm:ss')}"></td>
             <td>
+                <a th:href="@{/todoTask/doneDetail(taskId=${item.taskId})}">
+                    <button>查看详情</button>
+                </a>
                 <a th:href="@{/flowDiagram/view(processInstanceId=${item.processInstanceId})}" target="_blank">
                     <button>查看流程图</button>
                 </a>

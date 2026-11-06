@@ -4,48 +4,98 @@
     <meta charset="UTF-8">
     <title>审批办理</title>
     <link rel="stylesheet" th:href="@{/css/todoTask.css}">
-<script th:src="@{/js/ctx.js}"></script>
+    <link rel="stylesheet" th:href="@{/css/leaveFlow.css}">
+    <script th:src="@{/js/ctx.js}"></script>
 </head>
 <body>
-<div class="container">
-    <h2>审批办理</h2>
-    <form class="form-box" th:action="@{/todoTask/doAudit}" method="post">
-        <div class="form-row">
-            <div class="form-label">任务ID：</div>
-            <div>[[${task.id}]]</div>
-        </div>
-        <div class="form-row">
-            <div class="form-label">任务名称：</div>
-            <div>[[${task.name}]]</div>
-        </div>
-        <div class="form-row">
-            <div class="form-label">流程实例ID：</div>
-            <div>[[${task.processInstanceId}]]</div>
-        </div>
+<div th:replace="~{fragments/commonNav :: navBar}"></div>
 
-        <div class="form-row">
-            <div class="form-label">审批结果：</div>
-            <div class="radio-group">
-                <label>
-                    <input type="radio" name="auditResult" value="pass" checked/> 审批通过
-                </label>
-                <label>
-                    <input type="radio" name="auditResult" value="reject"/> 驳回申请
-                </label>
-            </div>
-        </div>
+<div class="lf-page">
+  <div class="lf-card">
 
-        <div class="form-row">
-            <div class="form-label">审批意见：</div>
-            <textarea name="auditComment" placeholder="请填写审批意见"></textarea>
-        </div>
+    <div class="lf-head">
+      <div class="lf-head-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div>
+        <h2>审批办理<span th:if="${task?.name}" th:text="' · ' + ${task.name}"></span></h2>
+        <p>进入本页时任务已自动签收给你，请审阅申请内容后给出结论</p>
+      </div>
+    </div>
 
-        <div class="btn-row">
-            <input type="hidden" th:value="${task?.id}" name="taskId"/>
-            <button class="submit-btn" type="submit">提交审批</button>
+    <div th:if="${msg}" class="success-msg">[[${msg}]]</div>
+    <div th:if="${errMsg}" class="warn-msg">[[${errMsg}]]</div>
+
+    <!-- 申请内容（来自流程变量，审批人必看） -->
+    <div class="lf-detail">
+      <div class="item">
+        <div class="k">申请人</div>
+        <div class="v">[[${applyUser}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">请假天数</div>
+        <div class="v"><span th:text="${leaveDays}"></span> 天</div>
+      </div>
+      <div class="item full">
+        <div class="k">请假事由</div>
+        <div class="v">[[${leaveReason}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">当前节点</div>
+        <div class="v">[[${task?.name}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">流程实例 ID</div>
+        <div class="v mono">[[${task?.processInstanceId}]]</div>
+      </div>
+    </div>
+
+    <form th:action="@{/todoTask/doAudit}" method="post" autocomplete="off">
+      <div class="lf-field">
+        <label>审批结论<span class="req">*</span></label>
+        <div class="lf-radio-cards">
+          <input type="radio" name="auditResult" value="pass" id="rPass" checked/>
+          <label class="opt-pass" for="rPass">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            审批通过
+          </label>
+          <input type="radio" name="auditResult" value="reject" id="rReject"/>
+          <label class="opt-reject" for="rReject">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            驳回申请
+          </label>
         </div>
+      </div>
+
+      <div class="lf-field">
+        <label>审批意见<span class="req">*</span></label>
+        <textarea class="lf-textarea" name="auditComment" id="auditComment" maxlength="200" required placeholder="请填写审批意见（驳回时建议说明原因），提交后通知会推送给流程发起人"></textarea>
+        <div class="lf-counter"><span id="cLeft">200</span> / 200</div>
+      </div>
+
+      <div class="lf-actions">
+        <input type="hidden" th:value="${task?.id}" name="taskId"/>
+        <button type="submit" class="lf-btn">提交审批</button>
+        <a class="lf-plain-btn" th:href="@{/todoTask/toPage(assignee=${session.loginUser})}">返回待办列表</a>
+      </div>
     </form>
+
+    <!-- 审批履历：公共片段（fragments/approvalHistory），非首节点且有已完成记录时展示 -->
+    <div th:replace="~{fragments/approvalHistory :: historyTable(${auditHistory})}"></div>
+  </div>
 </div>
+
 <div th:replace="~{fragments/statusBar :: statusBar}"></div>
+<script th:inline="javascript">
+  // 审批意见剩余字数提示（纯展示，后端仍有长度约束时另行处理）
+  (function(){
+    var ta = document.getElementById('auditComment');
+    var left = document.getElementById('cLeft');
+    if (!ta || !left) return;
+    var sync = function(){ left.textContent = String(200 - ta.value.length); };
+    ta.addEventListener('input', sync);
+    sync();
+  })();
+</script>
 </body>
 </html>

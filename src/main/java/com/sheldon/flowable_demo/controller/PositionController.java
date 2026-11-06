@@ -38,6 +38,8 @@ public class PositionController {
     private PositionGroupSyncRunner positionGroupSyncRunner;
     @Resource
     private SysPositionService sysPositionService;
+    @Resource
+    private org.flowable.engine.IdentityService identityService;
 
     // ==================== 页面 ====================
 
@@ -98,6 +100,21 @@ public class PositionController {
     }
 
     /**
+     * 保存成功后自动同步到 Flowable 引擎表。
+     * 岗位管理页面只写业务表（sys_position / sys_user_position），而流程判断
+     * "用户是否属于候选组"查的是 ACT_ID_GROUP / ACT_ID_MEMBERSHIP——
+     * 不同步的话，流程里的 candidateGroups 永远匹配不到人，待办会变孤儿任务。
+     * 同步失败不影响保存结果，可稍后手动点「同步到引擎」重试。
+     */
+    private void syncQuiet() {
+        try {
+            positionGroupSyncRunner.sync();
+        } catch (Exception e) {
+            log.error("岗位数据已保存，但同步到 Flowable 失败，请稍后在页面点「同步到引擎」重试", e);
+        }
+    }
+
+    /**
      * 新增或修改岗位：id 为空走新增，否则走修改
      */
     @PostMapping("/save")
@@ -109,11 +126,13 @@ public class PositionController {
                 String newId = sysPositionService.create(form);
                 Map<String, Object> data = new LinkedHashMap<>();
                 data.put("id", newId);
+                syncQuiet();
                 return ok(data);
             }
             sysPositionService.update(id, form);
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("id", id);
+            syncQuiet();
             return ok(data);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -124,13 +143,25 @@ public class PositionController {
     }
 
     /**
-     * 删除岗位（连带删除成员关系）
+     * 删除岗位（连带删除成员关系），并同步删除 Flowable 引擎里对应的候选组
      */
     @DeleteMapping("/{id}")
     @ResponseBody
     public Map<String, Object> delete(@PathVariable String id) {
         try {
+            SysPositionService.PositionRow row = sysPositionService.findById(id);
             sysPositionService.delete(id);
+            // 业务岗位删了，引擎里的组必须跟着删，否则 BPMN 里配了这个候选组
+            // 的节点仍然可能派任务给一个"幽灵组"（组内关系随 deleteGroup 一并清除）
+            if (row != null && row.getCode() != null && !row.getCode().trim().isEmpty()) {
+                try {
+                    if (identityService.createGroupQuery().groupId(row.getCode()).singleResult() != null) {
+                        identityService.deleteGroup(row.getCode());
+                    }
+                } catch (Exception e) {
+                    log.warn("删除 Flowable 候选组 {} 失败，可手动清理", row.getCode(), e);
+                }
+            }
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -191,6 +222,7 @@ public class PositionController {
                 }
             }
             sysPositionService.saveMembers(id, userIds, primaryId);
+            syncQuiet();
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -222,7 +254,8 @@ public class PositionController {
     public String sync() {
         try {
             int[] r = positionGroupSyncRunner.sync();
-            return "同步完成：新建组 " + r[0] + " 个，新增成员关系 " + r[1] + " 条";
+            return "同步完成：新建组 " + r[0] + " 个，新增成员关系 " + r[1]
+                    + " 条，清理失效成员关系 " + r[2] + " 条";
         } catch (Exception e) {
             log.error("岗位同步失败", e);
             return "同步失败：" + e.getMessage();

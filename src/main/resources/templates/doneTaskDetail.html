@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
+<head>
+    <meta charset="UTF-8">
+    <title>已办任务详情</title>
+    <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+    <link rel="stylesheet" th:href="@{/css/leaveFlow.css}">
+    <script th:src="@{/js/ctx.js}"></script>
+</head>
+<body>
+<div th:replace="~{fragments/commonNav :: navBar}"></div>
+
+<div class="lf-page">
+  <div class="lf-card">
+
+    <div class="lf-head">
+      <div class="lf-head-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div>
+        <h2>已办任务详情<span th:if="${taskName}" th:text="' · ' + ${taskName}"></span></h2>
+        <p>只读查看：申请内容与该流程的完整审批履历</p>
+      </div>
+    </div>
+
+    <!-- 申请内容（历史变量，流程已结束也能取到） -->
+    <div class="lf-detail">
+      <div class="item">
+        <div class="k">申请人</div>
+        <div class="v">[[${applyUser}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">请假天数</div>
+        <div class="v"><span th:text="${leaveDays}"></span> 天</div>
+      </div>
+      <div class="item full">
+        <div class="k">请假事由</div>
+        <div class="v">[[${leaveReason}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">办理节点</div>
+        <div class="v">[[${taskName}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">办理人</div>
+        <div class="v">[[${assignee}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">任务开始时间</div>
+        <div class="v">[[${#dates.format(startTime, 'yyyy-MM-dd HH:mm:ss')}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">任务办结时间</div>
+        <div class="v">[[${#dates.format(endTime, 'yyyy-MM-dd HH:mm:ss')}]]</div>
+      </div>
+      <div class="item">
+        <div class="k">流程状态</div>
+        <div class="v">
+          <span th:if="${processFinished}" class="lf-badge pass">已结束</span>
+          <span th:unless="${processFinished}" class="lf-badge submit">运行中</span>
+        </div>
+      </div>
+      <div class="item">
+        <div class="k">流程实例 ID</div>
+        <div class="v mono">[[${processInstanceId}]]</div>
+      </div>
+    </div>
+
+    <div class="lf-actions">
+      <a class="lf-plain-btn" th:href="@{/todoTask/donePage(assignee=${session.loginUser})}">返回已办列表</a>
+    </div>
+
+    <!-- 审批履历：公共片段（fragments/approvalHistory），与审批页同一份实现 -->
+    <div th:replace="~{fragments/approvalHistory :: historyTable(${auditHistory})}"></div>
+  </div>
+</div>
+
+<div th:replace="~{fragments/statusBar :: statusBar}"></div>
+</body>
+</html>

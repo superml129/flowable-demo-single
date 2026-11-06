@@ -1,12 +1,16 @@
 package com.sheldon.flowable_demo.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import com.sheldon.flowable_demo.service.ApprovalHistoryService;
 import org.flowable.engine.HistoryService;
+import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.flowable.task.api.TaskQuery;
+import org.flowable.engine.history.HistoricProcessInstance;
 import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.task.api.history.HistoricTaskInstanceQuery;
+import org.flowable.variable.api.history.HistoricVariableInstance;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -34,6 +38,10 @@ public class PageController {
     private TaskService taskService;
     @Resource
     private HistoryService historyService;
+    @Resource
+    private RuntimeService runtimeService;
+    @Resource
+    private ApprovalHistoryService approvalHistoryService;
 
     @GetMapping("/toPage")
     public ModelAndView todoTaskList(Model model,
@@ -257,7 +265,64 @@ public class PageController {
             }
         }
         model.addAttribute("task", task);
+        // 把申请内容（流程变量）带给审批页，审批人直接看到申请人/天数/事由
+        Map<String, Object> procVars = runtimeService.getVariables(task.getProcessInstanceId());
+        model.addAttribute("applyUser", procVars.get("applyUser"));
+        model.addAttribute("leaveDays", procVars.get("leaveDays"));
+        model.addAttribute("leaveReason", procVars.get("leaveReason"));
+        // 审批履历（公共能力，见 ApprovalHistoryService）：当前节点之前已完成的
+        // 节点记录，按完成时间倒序，含发起申请节点的"提交"记录。
+        // 第一个节点进入时为空列表，页面不显示履历区。
+        model.addAttribute("auditHistory",
+                approvalHistoryService.listFinishedRecords(task.getProcessInstanceId()));
         return new ModelAndView("auditTask");
+    }
+
+    //=======已办任务详情（只读）：查看申请内容与完整审批履历=======
+    @GetMapping("/doneDetail")
+    public ModelAndView doneDetail(@RequestParam String taskId,
+                                   Model model,
+                                   HttpSession session,
+                                   RedirectAttributes redirectAttributes) {
+        // 只允许查看已办结的任务：todoTask/toAudit 才是办理入口，这里纯只读
+        HistoricTaskInstance ht = historyService.createHistoricTaskInstanceQuery()
+                .taskId(taskId)
+                .finished()
+                .singleResult();
+        if (ht == null) {
+            redirectAttributes.addFlashAttribute("msg", "该任务不存在或尚未办理完成！");
+            return new ModelAndView("redirect:/todoTask/donePage");
+        }
+        String piid = ht.getProcessInstanceId();
+        // 申请内容取历史变量而不是运行时变量：流程可能已整体结束，
+        // runtimeService.getVariables 对已结束实例会直接抛异常
+        Map<String, Object> procVars = new HashMap<>();
+        for (HistoricVariableInstance v : historyService.createHistoricVariableInstanceQuery()
+                .processInstanceId(piid)
+                .list()) {
+            procVars.put(v.getVariableName(), v.getValue());
+        }
+
+        // 流程整体状态（运行中 / 已结束），用于详情页展示
+        HistoricProcessInstance hpi = historyService.createHistoricProcessInstanceQuery()
+                .processInstanceId(piid)
+                .singleResult();
+        boolean processFinished = hpi != null && hpi.getEndTime() != null;
+
+        model.addAttribute("taskName", ht.getName());
+        model.addAttribute("assignee", ht.getAssignee());
+        model.addAttribute("startTime", ht.getCreateTime());
+        model.addAttribute("endTime", ht.getEndTime());
+        model.addAttribute("processInstanceId", piid);
+        model.addAttribute("processFinished", processFinished);
+        model.addAttribute("applyUser", procVars.get("applyUser"));
+        model.addAttribute("leaveDays", procVars.get("leaveDays"));
+        model.addAttribute("leaveReason", procVars.get("leaveReason"));
+        // 审批履历（公共能力，见 ApprovalHistoryService）：全流程已完成节点，
+        // 按完成时间倒序。已办任务本身至少有一条完成记录，履历一定非空
+        model.addAttribute("auditHistory",
+                approvalHistoryService.listFinishedRecords(piid));
+        return new ModelAndView("doneTaskDetail");
     }
 
     //提交审批（通过/驳回）
@@ -289,6 +354,10 @@ public class PageController {
         Map<String, Object> vars = new HashMap<>();
         vars.put("auditResult", auditResult); // pass / reject
         vars.put("auditComment", auditComment);
+        // 结论+意见写入任务历史评论（ACT_HI_COMMENT）：流程变量会被下一个节点覆盖，
+        // 而审批履历需要每个节点各自的结论，所以必须在 complete 前落到任务级历史里
+        String tag = "pass".equals(auditResult) ? "通过" : "驳回";
+        taskService.addComment(taskId, task.getProcessInstanceId(), "[" + tag + "] " + auditComment);
         taskService.complete(taskId, vars);
         redirectAttributes.addFlashAttribute("msg", "审批提交成功！");
         return "redirect:/home/index";
