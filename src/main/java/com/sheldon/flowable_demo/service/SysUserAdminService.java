@@ -4,6 +4,7 @@ import com.baomidou.dynamic.datasource.annotation.DS;
 import com.sheldon.flowable_demo.mapper.SysUserAdminMapper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,8 @@ public class SysUserAdminService {
 
     @Resource
     private SysUserAdminMapper sysUserAdminMapper;
+    @Resource
+    private PasswordEncoder passwordEncoder;
 
     public List<UserRow> listUsers(String keyword, Integer status) {
         List<UserRow> list = sysUserAdminMapper.listUsers(trimToNull(keyword), status);
@@ -45,7 +48,7 @@ public class SysUserAdminService {
     @Transactional(rollbackFor = Exception.class)
     public Integer create(UserForm form) {
         String username = normalizeUsername(form.getUsername());
-        String password = requireText(form.getPassword(), "密码不能为空");
+        String password = requireText(passwordEncoder.encode(form.getPassword()), "密码不能为空");
         if (sysUserAdminMapper.countByUsername(username, null) > 0) {
             throw new IllegalArgumentException("用户名 " + username + " 已存在");
         }
@@ -57,6 +60,14 @@ public class SysUserAdminService {
         sysUserAdminMapper.insertUser(row);
         log.info("新增用户 id={} username={}", row.id, username);
         return row.id;
+    }
+
+    /**
+     * 直接更新密码（入参必须是已加密的密文）。
+     * 供后台重置密码与一次性明文迁移脚本使用；走本 Service 以落在 userdb 数据源。
+     */
+    public void updatePassword(Integer id, String passwordHash) {
+        sysUserAdminMapper.updatePassword(id, passwordHash);
     }
 
     /**
@@ -75,10 +86,12 @@ public class SysUserAdminService {
         Integer status = form.getStatus() == null ? exists.status : form.getStatus();
         sysUserAdminMapper.updateUser(id, username, trimToNull(form.getRealName()), status);
 
-        // 密码非空才更新
-        String pwd = trimToNull(form.getPassword());
-        if (pwd != null) {
-            sysUserAdminMapper.updatePassword(id, pwd);
+        // 密码留空 = 不修改；非空则先加密再更新
+        // （原写法 encode(form.getPassword()) 在留空时会对 null 抛 NPE、
+        //   或把空串算成"空密码的密文"写库，导致留空反而改了密码）
+        String rawPwd = trimToNull(form.getPassword());
+        if (rawPwd != null) {
+            sysUserAdminMapper.updatePassword(id, passwordEncoder.encode(rawPwd));
             log.info("重置用户密码 id={} username={}", id, username);
         }
     }

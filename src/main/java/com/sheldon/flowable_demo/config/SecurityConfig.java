@@ -1,6 +1,7 @@
 package com.sheldon.flowable_demo.config;
 
-import com.sheldon.flowable_demo.filter.CaptchaFilter;
+// import com.sheldon.flowable_demo.filter.CaptchaFilter;  // 2026-11-17 CaptchaFilter 已删除：验证码迁移 Redis 后它是死代码，
+                                                          // 重新启用 Spring Security 时需按 Redis 方案重写过滤器
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -52,7 +53,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
                 .and()
                 // 把验证码过滤器 放在账号密码认证过滤器前面
-                .addFilterBefore(new CaptchaFilter(), UsernamePasswordAuthenticationFilter.class)
+                // （CaptchaFilter 已删除，见文件头注释；整个 Security 配置当前未启用）
+                // .addFilterBefore(new CaptchaFilter(), UsernamePasswordAuthenticationFilter.class)
                 //自定义登录页面
                 .formLogin()
                 .loginPage("/login") //跳转登录页面地址
