@@ -22,14 +22,31 @@ public class SseMsgManager {
 
     // 推送给指定用户（发起人）
     public void sendMsg(String username, Object data) {
+        sendEvent(username, "newMsg", data);
+    }
+
+    /**
+     * 通用事件推送：不同业务用不同的事件名，前端 addEventListener 对应监听。
+     * @param eventName SSE 事件名，如 newMsg / forceLogout
+     */
+    public void sendEvent(String username, String eventName, Object data) {
         SseEmitter emitter = emitterMap.get(username);
         if (emitter != null) {
             try {
-                emitter.send(SseEmitter.event().name("newMsg").data(data));
+                emitter.send(SseEmitter.event().name(eventName).data(data));
             } catch (IOException e) {
                 emitter.complete();
                 emitterMap.remove(username);
             }
         }
+    }
+
+    /**
+     * 通知被踢下线的浏览器跳转登录页（场景③）。
+     * 注意：删 Redis 会话只是服务端失效，浏览器不发起请求就感知不到；
+     * 靠这条 SSE 事件才能做到「不点击也自动退出」。
+     */
+    public void sendForceLogout(String username) {
+        sendEvent(username, "forceLogout", "您的账号权限已变更，会话已失效，请重新登录");
     }
 }

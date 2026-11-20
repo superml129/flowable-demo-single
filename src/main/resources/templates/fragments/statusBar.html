@@ -109,6 +109,9 @@
         <div style="color:#fff;margin-left:24px;font-size:14px;">
             当前登录用户：<span th:text="${session.loginUser}"></span>
         </div>
+        <div style="color:#fff;margin-left:24px;font-size:14px;">
+            当前登录岗位：<span th:text="${session.loginPosition}"></span>
+        </div>
     </div>
 
     <script>
@@ -121,6 +124,12 @@
                     const data = JSON.parse(e.data);
                     // 更新角标
                     setBadge(data.unReadCount);
+                });
+                // 被管理员踢下线/权限变更（场景③）：立即跳转登录页
+                source.addEventListener('forceLogout', function(e) {
+                    source.close();
+                    alert('您的账号权限已变更，会话已失效，请重新登录');
+                    window.location.href = '/login/toPage';
                 });
                 source.onerror = function() {
                     source.close();

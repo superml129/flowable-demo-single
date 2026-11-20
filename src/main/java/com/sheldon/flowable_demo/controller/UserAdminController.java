@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -117,9 +118,9 @@ public class UserAdminController {
      */
     @DeleteMapping("/{id}")
     @ResponseBody
-    public Map<String, Object> delete(@PathVariable Integer id) {
+    public Map<String, Object> delete(@PathVariable Integer id, HttpSession session) {
         try {
-            sysUserAdminService.delete(id);
+            sysUserAdminService.delete(id, (String) session.getAttribute("loginUser"));
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -158,7 +159,8 @@ public class UserAdminController {
     @PostMapping("/{id}/positions")
     @ResponseBody
     public Map<String, Object> savePositions(@PathVariable Integer id,
-                                             @RequestBody Map<String, Object> body) {
+                                             @RequestBody Map<String, Object> body,
+                                             HttpSession session) {
         try {
             List<String> codes = new ArrayList<>();
             Object raw = body.get("codes");
@@ -171,7 +173,7 @@ public class UserAdminController {
             }
             Object p = body.get("primaryCode");
             String primary = p == null ? null : p.toString();
-            sysUserAdminService.savePositions(id, codes, primary);
+            sysUserAdminService.savePositions(id, codes, primary, (String) session.getAttribute("loginUser"));
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());

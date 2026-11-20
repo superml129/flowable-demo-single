@@ -19,6 +19,12 @@ public class SysUserService {
     @Resource
     private PasswordEncoder passwordEncoder;
 
+    /**
+     * 用户登录校验
+     * @param username 用户名
+     * @param password 密码
+     * @return SysUser 登录成功返回用户信息，失败返回 null
+     */
     public SysUser login(String username, String password){
         log.info("【登录校验】用户名:{}",username);
         SysUser user = sysUserMapper.findUserByUsername(username);

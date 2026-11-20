@@ -16,8 +16,12 @@ import javax.annotation.Resource;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * TaskCompleteNotifyEventListener 取代，勿再配置
+ */
 @Slf4j
 @Component
+@Deprecated
 public class NodeCompleteNotifyStarterListener implements ExecutionListener {
 
     @Resource

@@ -2,6 +2,8 @@ package com.sheldon.flowable_demo.listener;
 
 import com.sheldon.flowable_demo.entity.FlowMsg;
 import com.sheldon.flowable_demo.mapper.FlowMsgMapper;
+import com.sheldon.flowable_demo.mq.FlowEventProducer;
+import com.sheldon.flowable_demo.mq.MqMessage;
 import com.sheldon.flowable_demo.util.SseMsgManager;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.common.engine.api.delegate.event.FlowableEngineEntityEvent;
@@ -12,6 +14,7 @@ import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.service.impl.persistence.entity.TaskEntity;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -35,6 +38,9 @@ public class TaskCompleteNotifyEventListener extends AbstractFlowableEngineEvent
     private FlowMsgMapper flowMsgMapper;
     @Resource
     private SseMsgManager sseMsgManager;
+    @Autowired
+    private FlowEventProducer producer;
+
     // 延迟获取引擎服务，避免循环依赖
     private final ObjectProvider<RuntimeService> runtimeServiceProvider;
     private final ObjectProvider<RepositoryService> repositoryServiceProvider;
@@ -43,6 +49,24 @@ public class TaskCompleteNotifyEventListener extends AbstractFlowableEngineEvent
                                            ObjectProvider<RepositoryService> repositoryServiceProvider) {
         this.runtimeServiceProvider = runtimeServiceProvider;
         this.repositoryServiceProvider = repositoryServiceProvider;
+    }
+
+    @Override
+    protected void taskCreated(FlowableEngineEntityEvent event) {
+        if (!(event.getEntity() instanceof TaskEntity)) {
+            return;
+        }
+        TaskEntity task = (TaskEntity) event.getEntity();
+        try {
+            MqMessage e = new MqMessage();
+            e.setTaskId(task.getId());
+            e.setProcInstId(task.getProcessInstanceId());
+            e.setTaskName(task.getName());
+            e.setAssignee(task.getAssignee());   // 候选组模式可能为 null，见第五步说明
+            producer.sendTaskRemind(e);
+        } catch (Exception ex) {
+            log.error("发送延迟催办消息失败 taskId=" + task.getId(), ex);
+        }
     }
 
     @Override
@@ -84,22 +108,21 @@ public class TaskCompleteNotifyEventListener extends AbstractFlowableEngineEvent
                     : (procDef != null ? procDef.getKey() : "流程");
 
             // 入库消息
-            FlowMsg msg = new FlowMsg();
-            msg.setReceiver(starter);
-            msg.setProcessInstanceId(procInsId);
-            msg.setProcessDefName(procName);
-            msg.setTaskDefKey(task.getTaskDefinitionKey());
-            msg.setTaskName(taskName);
-            msg.setMsgContent("【" + procName + "】节点【" + taskName + "】已审批完成");
-            msg.setIsRead(0);
-            flowMsgMapper.insert(msg);
+            MqMessage e = new MqMessage();
+            e.setTaskId(task.getId());
+            e.setProcInstId(procInsId);
+            e.setTaskName(taskName);
+            e.setProcDefName(procName);
+            e.setReceiver(starter);
+            e.setMsgContent("【" + procName + "】节点【" + taskName + "】已审批完成");
+            producer.sendTaskCreatedEvent(e);
 
             // SSE实时推送
-            Map<String, Object> pushData = new HashMap<>();
-            pushData.put("unReadCount", flowMsgMapper.countUnRead(starter));
-            pushData.put("msg", msg);
-            sseMsgManager.sendMsg(starter, pushData);
-            log.info("推送消息给发起人:{} ,流程:{}", starter, procInsId);
+//            Map<String, Object> pushData = new HashMap<>();
+//            pushData.put("unReadCount", flowMsgMapper.countUnRead(starter));
+//            pushData.put("msg", msg);
+//            sseMsgManager.sendMsg(starter, pushData);
+//            log.info("推送消息给发起人:{} ,流程:{}", starter, procInsId);
         } catch (Exception e) {
             // 通知失败不能影响主流程事务
             log.error("任务完成通知失败, procInsId=" + procInsId, e);

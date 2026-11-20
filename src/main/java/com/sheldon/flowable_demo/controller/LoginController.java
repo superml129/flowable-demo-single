@@ -1,6 +1,10 @@
 package com.sheldon.flowable_demo.controller;
 
+import com.sheldon.flowable_demo.common.AuditEventType;
 import com.sheldon.flowable_demo.entity.SysUser;
+import com.sheldon.flowable_demo.mq.FlowEventProducer;
+import com.sheldon.flowable_demo.mq.MqMessage;
+import com.sheldon.flowable_demo.service.SessionUserService;
 import com.sheldon.flowable_demo.service.SysUserAdminService;
 import com.sheldon.flowable_demo.service.SysUserService;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -26,6 +31,10 @@ public class LoginController {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private SysUserAdminService sysUserAdminService;
+    @Resource
+    private SessionUserService sessionUserService;
+    @Resource
+    private FlowEventProducer producer;
 
     // 跳转登录页
     @GetMapping("/toPage")
@@ -87,10 +96,20 @@ public class LoginController {
         // ✅ 登录成功，把【登录账号】存入session，前端页面 ${loginUser} 继续使用不用改页面！
         session.setAttribute("loginUser", user.getUsername());
         session.setAttribute("password", user.getPassword());
-        // 查岗位编码集合，存 session（登录后不再每次请求查库）
-        Set<String> positions = sysUserAdminService.listPositionsOfUser(user.getId())
-                .stream().map(SysUserAdminService.UserPosition::getCode).collect(Collectors.toSet());
-        session.setAttribute("positionCodes", positions);
+        // 登记「用户名 -> sessionId」索引，供岗位/用户变更广播时按用户踢下线（场景③）
+        sessionUserService.bind(user.getUsername(), session.getId());
+        // 发送登录审计事件
+        producer.sendAudit(AuditEventType.AUDIT_LOGIN.getEventType(), user.getUsername(), AuditEventType.AUDIT_LOGIN.getDefaultMsgContent());
+        // 查岗位：一份存编码集合供权限拦截用，一份存名称供状态栏「当前登录岗位」展示
+        // listPositionsOfUser 已按 is_primary DESC, code 排序，主责岗位排在最前
+        List<SysUserAdminService.UserPosition> userPositions = sysUserAdminService.listPositionsOfUser(user.getId());
+        Set<String> positionCodes = userPositions.stream()
+                .map(SysUserAdminService.UserPosition::getCode).collect(Collectors.toSet());
+        session.setAttribute("positionCodes", positionCodes);
+        String loginPosition = userPositions.stream()
+                .map(p -> (p.getName() != null && !p.getName().isBlank()) ? p.getName() : p.getCode())
+                .collect(Collectors.joining("、"));
+        session.setAttribute("loginPosition", loginPosition.isBlank() ? "未分配岗位" : loginPosition);
 
         return "redirect:/home/index";
     }

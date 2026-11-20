@@ -203,6 +203,33 @@ public class SysPositionService {
         return t;
     }
 
+    public List<String> findMemberUsernames(String groupId) {
+        List<String> list = sysPositionMapper.findMemberUsernames(groupId);
+        return list != null ? list : new ArrayList<>();
+    }
+
+    /**
+     * 按用户 id 查登录账号。
+     * 岗位/用户变更广播只携带 userId，消费端靠它反查出 username 才能踢 Redis session。
+     */
+    public String findUsernameById(Integer userId) {
+        return userId == null ? null : sysPositionMapper.findUsernameById(userId);
+    }
+
+    /**
+     * 岗位下所有成员的用户名（岗位级变更时逐个踢下线用）
+     */
+    public List<String> listMemberUsernamesOfPosition(String positionId) {
+        List<SysPositionService.PositionUser> users = listUsersOfPosition(positionId);
+        List<String> usernames = new ArrayList<>();
+        for (PositionUser u : users) {
+            if (u.getUsername() != null && !u.getUsername().isEmpty()) {
+                usernames.add(u.getUsername());
+            }
+        }
+        return usernames;
+    }
+
     // ==================== 数据传输对象 ====================
 
     /**

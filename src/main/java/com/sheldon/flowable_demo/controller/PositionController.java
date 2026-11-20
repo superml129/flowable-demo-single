@@ -1,5 +1,7 @@
 package com.sheldon.flowable_demo.controller;
 
+import com.sheldon.flowable_demo.common.AuditEventType;
+import com.sheldon.flowable_demo.mq.FlowEventProducer;
 import com.sheldon.flowable_demo.service.PositionGroupSyncRunner;
 import com.sheldon.flowable_demo.service.SysPositionService;
 import lombok.extern.slf4j.Slf4j;
@@ -14,11 +16,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 岗位管理：
@@ -38,6 +42,8 @@ public class PositionController {
     private PositionGroupSyncRunner positionGroupSyncRunner;
     @Resource
     private SysPositionService sysPositionService;
+    @Resource
+    private FlowEventProducer producer;
     @Resource
     private org.flowable.engine.IdentityService identityService;
 
@@ -119,7 +125,7 @@ public class PositionController {
      */
     @PostMapping("/save")
     @ResponseBody
-    public Map<String, Object> save(@RequestBody SysPositionService.PositionForm form) {
+    public Map<String, Object> save(@RequestBody SysPositionService.PositionForm form, HttpSession session) {
         try {
             String id = form.getId();
             if (id == null || id.trim().isEmpty()) {
@@ -127,12 +133,22 @@ public class PositionController {
                 Map<String, Object> data = new LinkedHashMap<>();
                 data.put("id", newId);
                 syncQuiet();
+                // 发送岗位变更审计事件
+                String msgContent = "新增岗位 " + form.getName() + "（" + newId + "）";
+                producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(),
+                        (String) session.getAttribute("loginUser"), msgContent);
                 return ok(data);
             }
             sysPositionService.update(id, form);
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("id", id);
             syncQuiet();
+            // 岗位停用/改名等本身变化：广播踢该岗位全部现有成员，重新登录拿到新状态
+            producer.sendPositionChanged("POSITION_CHANGE", id);
+            // 发送岗位变更审计事件
+            String msgContent = "修改岗位 " + form.getName() + "（" + form.getCode() + "）";
+            producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(),
+                    (String) session.getAttribute("loginUser"), msgContent);
             return ok(data);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -147,9 +163,11 @@ public class PositionController {
      */
     @DeleteMapping("/{id}")
     @ResponseBody
-    public Map<String, Object> delete(@PathVariable String id) {
+    public Map<String, Object> delete(@PathVariable String id, HttpSession session) {
         try {
             SysPositionService.PositionRow row = sysPositionService.findById(id);
+            // 删除前先记下现有成员：删除后成员关系也没了，无法再查出来踢下线
+            List<SysPositionService.PositionUser> members = sysPositionService.listUsersOfPosition(id);
             sysPositionService.delete(id);
             // 业务岗位删了，引擎里的组必须跟着删，否则 BPMN 里配了这个候选组
             // 的节点仍然可能派任务给一个"幽灵组"（组内关系随 deleteGroup 一并清除）
@@ -162,6 +180,16 @@ public class PositionController {
                     log.warn("删除 Flowable 候选组 {} 失败，可手动清理", row.getCode(), e);
                 }
             }
+            // 被移出岗位的用户重新登录后才失去该岗位权限，逐个广播踢下线
+            for (SysPositionService.PositionUser m : members) {
+                if (m.getUserId() != null) {
+                    producer.sendPositionChanged(m.getUserId(), "MEMBER_CHANGE");
+                }
+            }
+            // 发送岗位变更审计事件埋点
+            String msgContent = "删除岗位 " + id + "及其成员（" + members.stream().map(SysPositionService.PositionUser::getUserId).collect(Collectors.toList()) + "）";
+            producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(),
+                    (String) session.getAttribute("loginUser"), msgContent);
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
@@ -193,7 +221,8 @@ public class PositionController {
     @PostMapping("/{id}/members")
     @ResponseBody
     public Map<String, Object> saveMembers(@PathVariable String id,
-                                           @RequestBody Map<String, Object> body) {
+                                           @RequestBody Map<String, Object> body,
+                                           HttpSession session) {
         try {
             List<Integer> userIds = new ArrayList<>();
             Object raw = body.get("userIds");
@@ -221,8 +250,28 @@ public class PositionController {
                     // 忽略非法值
                 }
             }
+            // 保存前先记下原成员，便于事后把「被移出」的人也广播到
+            List<Integer> beforeIds = new ArrayList<>();
+            for (SysPositionService.PositionUser u : sysPositionService.listUsersOfPosition(id)) {
+                if (u.getUserId() != null) {
+                    beforeIds.add(u.getUserId());
+                }
+            }
             sysPositionService.saveMembers(id, userIds, primaryId);
             syncQuiet();
+            // 广播：原成员 ∪ 新成员，覆盖「被移出」「被加入」「主责变更」三种情况。
+            // 每人一条 MEMBER_CHANGE，消费端逐个踢下线。
+            java.util.LinkedHashSet<Integer> affected = new java.util.LinkedHashSet<>(beforeIds);
+            affected.addAll(userIds);
+            for (Integer uid : affected) {
+                if (uid != null) {
+                    producer.sendPositionChanged(uid, "MEMBER_CHANGE");
+                }
+            }
+            // 发送岗位变更审计事件
+            String msgContent = "岗位 " + id + "成员变更，老成员 " + beforeIds + "，新成员 " + userIds;
+            producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(),
+                    (String) session.getAttribute("loginUser"), msgContent);
             return ok(null);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());

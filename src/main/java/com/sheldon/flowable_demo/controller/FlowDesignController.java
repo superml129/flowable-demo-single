@@ -1,5 +1,7 @@
 package com.sheldon.flowable_demo.controller;
 
+import com.sheldon.flowable_demo.common.AuditEventType;
+import com.sheldon.flowable_demo.mq.FlowEventProducer;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RepositoryService;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -25,16 +28,22 @@ public class FlowDesignController {
 
     @Resource
     private RepositoryService repositoryService;
+    @Resource
+    private FlowEventProducer producer;
 
     @ResponseBody
     @PostMapping("/deploy")
-    public String deploy(@RequestBody DeployDTO dto){
+    public String deploy(@RequestBody DeployDTO dto, HttpSession session){
         try {
             Deployment deploy = repositoryService.createDeployment()
                     .name(dto.getName())
                     .addBytes(dto.getName()+".bpmn20.xml", dto.getBpmnXml().getBytes(StandardCharsets.UTF_8))
                     .deploy();
             log.info("流程部署成功，deploymentId:{}", deploy.getId());
+            // 发送工作流部署审计事件
+            String msgContent = "部署流程 " + dto.getName() + "（deploymentId:" + deploy.getId() + "）";
+            producer.sendAudit(AuditEventType.AUDIT_PROCESS_DEPLOY.getEventType(),
+                    (String) session.getAttribute("loginUser"), msgContent);
             return "部署成功，部署ID:"+deploy.getId();
         }catch (Exception e){
             log.error("部署异常",e);

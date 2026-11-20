@@ -1,7 +1,9 @@
 package com.sheldon.flowable_demo.service;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
+import com.sheldon.flowable_demo.common.AuditEventType;
 import com.sheldon.flowable_demo.mapper.SysUserAdminMapper;
+import com.sheldon.flowable_demo.mq.FlowEventProducer;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +29,8 @@ public class SysUserAdminService {
     private SysUserAdminMapper sysUserAdminMapper;
     @Resource
     private PasswordEncoder passwordEncoder;
+    @Resource
+    private FlowEventProducer producer;
 
     public List<UserRow> listUsers(String keyword, Integer status) {
         List<UserRow> list = sysUserAdminMapper.listUsers(trimToNull(keyword), status);
@@ -99,10 +103,11 @@ public class SysUserAdminService {
     /**
      * 删除用户，连带删除其岗位归属
      *
+     * @param operator 操作人（当前登录账号），由 Controller 从 session 传入，审计日志记录用
      * @throws IllegalArgumentException 当尝试删除最后一个启用用户时
      */
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Integer id) {
+    public void delete(Integer id, String operator) {
         UserRow exists = id == null ? null : sysUserAdminMapper.findById(id);
         if (exists == null) {
             throw new IllegalArgumentException("用户不存在：" + id);
@@ -114,17 +119,23 @@ public class SysUserAdminService {
         }
         sysUserAdminMapper.deletePositionsOfUser(id);
         sysUserAdminMapper.deleteUser(id);
-        log.info("删除用户 id={} username={}", id, exists.username);
+        log.info("删除用户 id={} username={} operator={}", id, exists.username, operator);
+        // 广播：踢掉被删用户残留的 Redis 会话，并让各实例清理其在候选组中的关系
+        producer.sendPositionChanged(id, "USER_CHANGE");
+        // 发送岗位变更审计事件：operator 是登录人，被删的账号写在内容里
+        String msgContent = "删除用户 " + exists.username + " 及其岗位";
+        producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(), operator, msgContent);
     }
 
     /**
      * 全量重置某用户的岗位归属
      *
+     * @param operator      操作人（当前登录账号），由 Controller 从 session 传入，审计日志记录用
      * @param positionCodes 岗位 code 列表，空表示清空
      * @param primaryCode   主责岗位 code，可为 null
      */
     @Transactional(rollbackFor = Exception.class)
-    public void savePositions(Integer userId, List<String> positionCodes, String primaryCode) {
+    public void savePositions(Integer userId, List<String> positionCodes, String primaryCode, String operator) {
         UserRow exists = userId == null ? null : sysUserAdminMapper.findById(userId);
         if (exists == null) {
             throw new IllegalArgumentException("用户不存在：" + userId);
@@ -132,6 +143,7 @@ public class SysUserAdminService {
         sysUserAdminMapper.deletePositionsOfUser(userId);
         if (positionCodes == null || positionCodes.isEmpty()) {
             log.info("用户 id={} 岗位归属已清空", userId);
+            producer.sendPositionChanged(userId, "USER_CHANGE");
             return;
         }
         String primary = trimToNull(primaryCode);
@@ -147,6 +159,12 @@ public class SysUserAdminService {
             sysUserAdminMapper.insertUserPosition(userId, c, c.equals(primary) ? 1 : 0);
         }
         log.info("用户 id={} 岗位归属已更新，共 {} 个", userId, positionCodes.size());
+        // 广播用户变更：各实例重新对账 Flowable 候选组，并踢该用户的 Redis 会话，
+        // 让它重新登录后拿到最新的 positionCodes。发送失败不影响本次保存。
+        producer.sendPositionChanged(userId, "USER_CHANGE");
+        // 发送岗位变更审计事件：operator 是登录人，被调整的账号写在内容里
+        String msgContent = "更新用户 " + exists.username + " 的岗位归属";
+        producer.sendAudit(AuditEventType.AUDIT_POSITION_CHANGE.getEventType(), operator, msgContent);
     }
 
     // ==================== 内部工具 ====================

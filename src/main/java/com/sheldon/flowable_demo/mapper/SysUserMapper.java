@@ -7,4 +7,7 @@ import org.apache.ibatis.annotations.Select;
 public interface SysUserMapper {
     @Select("select * from sys_user where username=#{username} and status=1")
     SysUser findUserByUsername(@Param("username") String username);
+
+    @Select("select * from sys_user where id=#{userid} and status=1")
+    SysUser findUserByUserid(@Param("userid") String userid);
 }

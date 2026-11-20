@@ -144,4 +144,17 @@ public interface SysPositionMapper {
             "WHERE user_id = #{userId} AND position_id = #{positionId}")
     int updateMemberPrimary(@Param("userId") Integer userId, @Param("positionId") String positionId,
                             @Param("isPrimary") Integer isPrimary);
+
+    /**
+     * 按用户 id 查登录账号（岗位变更广播时用来定位要踢下线的账号）
+     */
+    @Select("SELECT username FROM sys_user WHERE id = #{userId}")
+    String findUsernameById(@Param("userId") Integer userId);
+
+    @Select("SELECT u.username " +
+            "FROM sys_user_position up " +
+            "JOIN sys_position p ON p.id = up.position_id " +
+            "JOIN sys_user u ON u.id = up.user_id " +
+            "WHERE p.code = #{groupCode} AND u.status = 1")
+    List<String> findMemberUsernames(@Param("groupCode") String groupCode);
 }
