@@ -6,6 +6,8 @@
         <form class="search-form-inner">
             <span class="label-text">查询办理人：</span>
             <input type="text" name="assignee" th:value="${searchUser}" placeholder="请输入办理人账号"/>
+            <span class="label-text" style="margin-left:12px;">业务关键字：</span>
+            <input type="text" name="bizKeyword" th:value="${bizKeyword}" placeholder="附件ID等，模糊匹配"/>
             <input type="hidden" name="pageNum" th:value="${pageNum}"/>
             <input type="hidden" name="pageSize" th:value="${pageSize}"/>
             <input type="hidden" name="sortField" th:value="${sortField}"/>
@@ -88,6 +90,10 @@
             const input = document.querySelector('.search-form-inner input[name="assignee"]');
             return input?.value ?? '';
         }
+        function getSearchKeyword() {
+            const input = document.querySelector('.search-form-inner input[name="bizKeyword"]');
+            return input?.value ?? '';
+        }
         function tableCurrentSize() {
             return document.querySelector('.search-form-inner input[name="pageSize"]')?.value || 10;
         }
@@ -113,7 +119,7 @@
                     let curField = tableCurrentSortField();
                     let curOrder = tableCurrentSortOrder();
                     let newOrder = (field === curField && curOrder === 'asc') ? 'desc' : 'asc';
-                    reloadTable(1, tableCurrentSize(), field, newOrder, getSearchAssignee());
+                    reloadTable(1, tableCurrentSize(), field, newOrder, getSearchAssignee(), getSearchKeyword());
                     return;
                 }
 
@@ -123,7 +129,7 @@
             document.addEventListener('submit', function (e) {
                 if (e.target && e.target.matches('.search-form-inner')) {
                     e.preventDefault();
-                    reloadTable(1, tableCurrentSize(), '', '', getSearchAssignee());
+                    reloadTable(1, tableCurrentSize(), '', '', getSearchAssignee(), getSearchKeyword());
                 }
             })
         }

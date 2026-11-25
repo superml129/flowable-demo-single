@@ -38,7 +38,7 @@ public class LoginInterceptor implements WebMvcConfigurer {
         registry.addInterceptor(new AuthHandlerInterceptor())
                 .addPathPatterns("/**")
                 // 静态资源放行，避免 session 过期时 vendor 下的 js/css 被 302 成登录页
-                .excludePathPatterns("/login/**", "/css/**", "/js/**", "/captcha",
+                .excludePathPatterns("/login/**", "/noPermission", "/css/**", "/js/**", "/captcha",
                         "/vendor/**", "/static/**", "/favicon.svg", "/metrics.html", "/error",
                         // 岗位字典只含编码与名称，供设计器「候选岗位」下拉使用。
                         // 只放行这一个只读接口，岗位管理页与写接口仍要求登录。
@@ -88,7 +88,7 @@ public class LoginInterceptor implements WebMvcConfigurer {
             return matched;
         }
 
-        /** 区分 AJAX 与页面请求：AJAX 返回 JSON，页面返回 403 错误页 */
+        /** 区分 AJAX 与页面请求：AJAX 返回 JSON，页面重定向到友好的无权限提示页 */
         private void deny(HttpServletRequest request, HttpServletResponse response,
                           String requiredPosition) throws IOException {
             if (isAjax(request)) {
@@ -97,7 +97,15 @@ public class LoginInterceptor implements WebMvcConfigurer {
                 response.getWriter().write(
                         "{\"success\":false,\"message\":\"无权访问，需要岗位：" + requiredPosition + "\"}");
             } else {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                // 去掉 contextPath，供提示页判断是哪个菜单；再拼回带 contextPath 的跳转地址
+                String path = request.getRequestURI();
+                String ctx = request.getContextPath();
+                if (ctx != null && !ctx.isEmpty() && path.startsWith(ctx)) {
+                    path = path.substring(ctx.length());
+                }
+                response.sendRedirect((ctx == null ? "" : ctx) + "/noPermission"
+                        + "?required=" + requiredPosition
+                        + "&path=" + java.net.URLEncoder.encode(path, "UTF-8"));
             }
         }
 

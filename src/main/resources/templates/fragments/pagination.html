@@ -34,6 +34,7 @@
       // 注意：这里必须用 id 选择器（select 只有 id，没有 class）
       const size = document.getElementById('pageSizeSelect')?.value || 10;
       const assignee = document.querySelector('.search-form-inner input[name="assignee"]')?.value ?? '';
+      const bizKeyword = document.querySelector('.search-form-inner input[name="bizKeyword"]')?.value ?? '';
 
       // 异步页面（todoTaskTable）里隐藏域保存着最新排序状态，优先读取，避免用页面初始值
       const hiddenSortField = document.querySelector('.search-form-inner input[name="sortField"]')?.value;
@@ -43,13 +44,14 @@
 
       if (typeof reloadTable === 'function') {
         // 异步页面：局部刷新表格
-        reloadTable(targetPage, size, sf, so, assignee);
+        reloadTable(targetPage, size, sf, so, assignee, bizKeyword);
       } else {
         // 同步页面（首页/已办列表）：整页跳转
         let href = pagerUrl + '?pageNum=' + targetPage + '&pageSize=' + size;
         if (sf) href += '&sortField=' + encodeURIComponent(sf);
         if (so) href += '&sortOrder=' + encodeURIComponent(so);
         if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
+        if (bizKeyword) href += '&bizKeyword=' + encodeURIComponent(bizKeyword);
         // pagerUrl 已带上下文前缀，这里的 href 直接跳转即可
         window.location.href = href;
       }

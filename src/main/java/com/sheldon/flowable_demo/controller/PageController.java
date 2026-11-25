@@ -1,7 +1,9 @@
 package com.sheldon.flowable_demo.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import com.sheldon.flowable_demo.entity.Attachment;
 import com.sheldon.flowable_demo.service.ApprovalHistoryService;
+import com.sheldon.flowable_demo.service.AttachmentService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -42,12 +44,15 @@ public class PageController {
     private RuntimeService runtimeService;
     @Resource
     private ApprovalHistoryService approvalHistoryService;
+    @Resource
+    private AttachmentService attachmentService;
 
     @GetMapping("/toPage")
     public ModelAndView todoTaskList(Model model,
                                      HttpSession session,
                                      HttpServletRequest request,
                                      @RequestParam(required = false) String assignee,
+                                     @RequestParam(required = false) String bizKeyword,
                                      @RequestParam(defaultValue = "1") Integer pageNum,
                                      @RequestParam(defaultValue = "10") Integer pageSize,
                                      @RequestParam(defaultValue = "createTime") String sortField,
@@ -79,11 +84,19 @@ public class PageController {
             // 只查 taskAssignee 会漏掉"岗位待办"，组内成员看不到分给岗位的任务
             countQuery.taskCandidateOrAssigned(finalAssignee.trim());
         }
+        // 业务关键字（附件ID）：attachmentId 流程变量存的是逗号拼接串 id1,id2,id3，
+        // 用 like 才能命中其中单个 ID；与普通查询条件叠加，不破坏"只能查自己"的权限
+        if (bizKeyword != null && bizKeyword.trim().length() > 0) {
+            countQuery.processVariableValueLike("attachmentId", "%" + bizKeyword.trim() + "%");
+        }
         long total = countQuery.count();
 
         TaskQuery taskQuery = taskService.createTaskQuery();
         if(finalAssignee != null && finalAssignee.trim().length()>0){
             taskQuery.taskCandidateOrAssigned(finalAssignee.trim());
+        }
+        if (bizKeyword != null && bizKeyword.trim().length() > 0) {
+            taskQuery.processVariableValueLike("attachmentId", "%" + bizKeyword.trim() + "%");
         }
 
         // 动态排序
@@ -129,6 +142,7 @@ public class PageController {
         model.addAttribute("total", total);
         model.addAttribute("totalPages", (total + pageSize - 1) / pageSize); //总页数向上取整
         model.addAttribute("searchUser", assignee);
+        model.addAttribute("bizKeyword", bizKeyword);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
 
@@ -148,6 +162,7 @@ public class PageController {
                                      HttpSession session,
                                      HttpServletRequest request,
                                      @RequestParam(required = false) String assignee,
+                                     @RequestParam(required = false) String bizKeyword,
                                      @RequestParam(defaultValue = "1") Integer pageNum,
                                      @RequestParam(defaultValue = "10") Integer pageSize,
                                      @RequestParam(defaultValue = "createTime") String sortField,
@@ -178,12 +193,19 @@ public class PageController {
         if (finalAssignee != null && finalAssignee.trim().length() > 0) {
             countQuery.taskAssignee(finalAssignee.trim());
         }
+        // 已办查的是历史流程变量表（ACT_HI_VARINST），同样是逗号拼接串，用 like 命中单个附件ID
+        if (bizKeyword != null && bizKeyword.trim().length() > 0) {
+            countQuery.processVariableValueLike("attachmentId", "%" + bizKeyword.trim() + "%");
+        }
         countQuery.finished();
         long total = countQuery.count();
 
         HistoricTaskInstanceQuery taskQuery = historyService.createHistoricTaskInstanceQuery();
         if (finalAssignee != null && finalAssignee.trim().length() > 0) {
             taskQuery.taskAssignee(finalAssignee.trim());
+        }
+        if (bizKeyword != null && bizKeyword.trim().length() > 0) {
+            taskQuery.processVariableValueLike("attachmentId", "%" + bizKeyword.trim() + "%");
         }
         taskQuery.finished();
         // 动态排序
@@ -227,6 +249,7 @@ public class PageController {
         model.addAttribute("total", total);
         model.addAttribute("totalPages", (total + pageSize - 1) / pageSize);
         model.addAttribute("searchUser", assignee);
+        model.addAttribute("bizKeyword", bizKeyword);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
 
@@ -270,6 +293,8 @@ public class PageController {
         model.addAttribute("applyUser", procVars.get("applyUser"));
         model.addAttribute("leaveDays", procVars.get("leaveDays"));
         model.addAttribute("leaveReason", procVars.get("leaveReason"));
+        // 申请人上传的 PDF 附件列表：按流程实例 ID 反查 sys_attachment（多附件场景）
+        model.addAttribute("attachments", attachmentService.listByBizId(task.getProcessInstanceId()));
         // 审批履历（公共能力，见 ApprovalHistoryService）：当前节点之前已完成的
         // 节点记录，按完成时间倒序，含发起申请节点的"提交"记录。
         // 第一个节点进入时为空列表，页面不显示履历区。

@@ -200,6 +200,29 @@
 }
 .lf-plain-btn:hover{ background: #e6ecf5; }
 
+/* 审批页申请附件行：三列网格（文件名 | 预览 | 下载），保证按钮列上下对齐 */
+.attach-row{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 8px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+.attach-row > .attach-name{
+    color: #334155;
+    font-weight: 500;
+    word-break: break-all;
+}
+/* 覆盖 .lf-plain-btn 的大 padding（按钮原本 11px 上下内边距会撑高整行） */
+.attach-row .lf-plain-btn{
+    padding: 4px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    justify-self: start;
+}
+
 /* 审批页：申请详情只读区块 */
 .lf-detail{
     display: grid;

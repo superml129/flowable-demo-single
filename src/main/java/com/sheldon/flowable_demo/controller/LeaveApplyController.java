@@ -1,5 +1,6 @@
 package com.sheldon.flowable_demo.controller;
 
+import com.sheldon.flowable_demo.service.AttachmentService;
 import org.flowable.common.engine.impl.identity.Authentication;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.annotation.Resource;
@@ -27,17 +29,21 @@ public class LeaveApplyController {
     @Resource
     private TaskService taskService;
 
+    @Resource
+    private AttachmentService attachmentService;
+
     // 跳转到提交表单页面（发起人=当前登录人，页面只读展示）
     @RequestMapping("/toPage")
     public String toApplyPage(){
         return "leaveApply";
     }
 
-    // 提交表单，启动流程
+    // 提交表单，启动流程。表单为 multipart，attachment 可选（PDF，≤10MB）
     @PostMapping("/submit")
     public String submitLeave(HttpSession session,
                               @RequestParam Integer leaveDays,
                               @RequestParam String leaveReason,
+                              @RequestParam(value = "attachment", required = false) List<MultipartFile> attachments,
                               RedirectAttributes redirectAttributes){
 
         // 发起人一律取当前登录人：页面上的发起人是只读展示，这里也不再接收表单参数，
@@ -46,6 +52,32 @@ public class LeaveApplyController {
         if (loginUser == null || loginUser.isBlank()) {
             redirectAttributes.addFlashAttribute("errMsg", "登录状态已失效，请重新登录后再提交申请");
             return "redirect:/login/toPage";
+        }
+
+        List<String> attachmentIds = new ArrayList<>();
+        // required=false 且用户没选文件时，Spring 可能绑成 null，必须判空
+        if (attachments != null) {
+            for (MultipartFile attachment : attachments) {
+                // 附件先校验并落盘（在流程启动之前）：失败直接退回申请页，不启动流程。
+                // 落盘拿到 attachmentId 后，流程启动成功再绑定实例 ID。
+                String attachmentId = null;
+                if (attachment != null && !attachment.isEmpty()) {
+                    try {
+                        attachmentId = attachmentService.save(
+                                attachment.getOriginalFilename(),
+                                attachment.getInputStream(),
+                                attachment.getSize(),
+                                loginUser);
+                        attachmentIds.add(attachmentId);
+                    } catch (IllegalArgumentException | java.io.IOException e) {
+                        for(String id : attachmentIds) {
+                            attachmentService.delete(id);
+                        }
+                        redirectAttributes.addFlashAttribute("errMsg", "附件不符合要求：" + e.getMessage());
+                        return "redirect:/leaveApply/toPage";
+                    }
+                }
+            }
         }
 
         Map<String,Object> variables = new HashMap<>();
@@ -62,6 +94,13 @@ public class LeaveApplyController {
             // 审批节点在 BPMN 里绑定了 candidateGroups（岗位），
             // 流转到哪个节点由流程定义决定，这里不需要（也不应该）指定岗位/审批人
             instanceId = runtimeService.startProcessInstanceByKey("leaveProcess", variables).getId();
+
+            // 附件与流程实例绑定：attachmentIds拆分每个attachmentId，然后用逗号连接的字符串 存为流程变量（审批页直接读取），
+            // 元数据表的 biz_id 回填实例 ID（便于按实例反查/运维排查）
+            runtimeService.setVariable(instanceId, "attachmentId", String.join(",", attachmentIds));
+            for(String attachmentId : attachmentIds) {
+                attachmentService.bindBizId(attachmentId, instanceId);
+            }
 
             // 发起即提交：流程的第一个节点「发起申请」就是页面上的这次提交动作本身，
             // 由系统代表发起人立即完成（写入"提交"履历），待办不落在发起人名下，

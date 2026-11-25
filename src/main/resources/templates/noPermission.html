@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org" th:attr="data-ctx=@{/}">
+<head>
+    <meta charset="UTF-8">
+    <title>无权访问</title>
+    <link rel="stylesheet" th:href="@{/css/todoTask.css}">
+    <link rel="stylesheet" th:href="@{/css/leaveFlow.css}">
+    <script th:src="@{/js/ctx.js}"></script>
+    <style>
+        .np-wrap{ width:100%; max-width:640px; margin:60px auto; padding:0 20px; box-sizing:border-box; }
+        .np-card{ background:#fff; border:1px solid #e6ecf3; border-radius:14px; padding:44px 40px; text-align:center; box-shadow:0 6px 24px rgba(31,45,61,.06); }
+        .np-icon{ width:72px; height:72px; margin:0 auto 20px; border-radius:50%; background:#fff4e5; display:flex; align-items:center; justify-content:center; }
+        .np-icon svg{ width:38px; height:38px; stroke:#e08a1e; }
+        .np-title{ font-size:22px; font-weight:600; color:#334155; margin:0 0 12px; }
+        .np-desc{ font-size:14px; color:#64748b; line-height:1.9; margin:0 0 8px; }
+        .np-req{ display:inline-block; margin-top:14px; padding:8px 16px; background:#f1f5f9; border-radius:8px; font-size:13px; color:#475569; }
+        .np-req b{ color:#e08a1e; }
+        .np-actions{ margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    </style>
+</head>
+<body>
+<div th:replace="~{fragments/commonNav :: navBar}"></div>
+
+<div class="np-wrap">
+  <div class="np-card">
+    <div class="np-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <h2 class="np-title">抱歉，您没有访问权限</h2>
+    <p class="np-desc">
+      您当前账号无权访问 <b th:text="${menu}">该页面</b>，因此无法继续操作。
+    </p>
+    <div class="np-req">
+      该功能需要岗位权限：<b th:text="${required}">系统管理员</b>
+    </div>
+    <div class="np-actions">
+      <a th:href="@{/home/index}" class="lf-plain-btn">返回首页</a>
+      <a href="javascript:history.back()" class="lf-plain-btn">返回上一页</a>
+    </div>
+  </div>
+</div>
+
+<div th:replace="~{fragments/statusBar :: statusBar}"></div>
+</body>
+</html>

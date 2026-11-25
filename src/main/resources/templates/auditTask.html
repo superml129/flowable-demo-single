@@ -50,6 +50,30 @@
       </div>
     </div>
 
+    <!-- 申请附件：每个附件一行，点「预览」才在下方共享 iframe 加载对应 PDF -->
+    <div class="lf-field" th:if="${attachments != null and !attachments.isEmpty()}">
+      <label>附件</label>
+      <div th:each="att : ${attachments}" class="lf-tip attach-row">
+        <span class="attach-name">
+          <span th:text="${att.originalName}"></span>
+          <span style="color:#8492a6;font-weight:400;">（PDF）</span>
+        </span>
+        <a href="javascript:void(0)" class="previewBtn lf-plain-btn"
+           th:attr="data-src=@{/attachment/preview/{id}(id=${att.id})}">预览</a>
+        <a th:href="@{/attachment/download/{id}(id=${att.id})}" class="lf-plain-btn">下载</a>
+      </div>
+      <div id="previewBox" style="display:none;">
+        <div id="previewTitle" style="color:#8492a6;font-size:13px;margin-bottom:6px;"></div>
+        <iframe id="previewFrame" width="100%" height="500px"
+                style="border:1px solid #ddd;border-radius:6px;background:#f7f8fa;"
+                title="附件预览"></iframe>
+      </div>
+    </div>
+    <div class="lf-field" th:if="${attachments == null or attachments.isEmpty()}">
+      <label>附件</label>
+      <div class="lf-tip">本次申请未上传附件</div>
+    </div>
+
     <form th:action="@{/todoTask/doAudit}" method="post" autocomplete="off">
       <div class="lf-field">
         <label>审批结论<span class="req">*</span></label>
@@ -86,6 +110,24 @@
 </div>
 
 <div th:replace="~{fragments/statusBar :: statusBar}"></div>
+<script th:inline="javascript">
+  // 多个附件共用一个 iframe：点哪一行的「预览」就把 src 切到哪个 PDF（懒加载）。
+  // 每个按钮的地址由 th:attr=data-src 写入，不需要在这里拼 URL。
+  (function(){
+    var box = document.getElementById('previewBox');
+    var frame = document.getElementById('previewFrame');
+    var title = document.getElementById('previewTitle');
+    if (!box || !frame || !title) return;
+    document.querySelectorAll('.previewBtn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var row = btn.closest('.attach-row');
+        title.textContent = '正在预览：' + (row ? row.querySelector('span').textContent : '');
+        frame.src = btn.getAttribute('data-src');   // 切换地址即切换预览内容，只有点过的才加载
+        box.style.display = 'block';
+      });
+    });
+  })();
+</script>
 <script th:inline="javascript">
   // 审批意见剩余字数提示（纯展示，后端仍有长度约束时另行处理）
   (function(){

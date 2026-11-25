@@ -26,7 +26,7 @@
     <div th:if="${msg}" class="success-msg">[[${msg}]]</div>
     <div th:if="${errMsg}" class="warn-msg">[[${errMsg}]]</div>
 
-    <form th:action="@{/leaveApply/submit}" method="post" autocomplete="off">
+    <form th:action="@{/leaveApply/submit}" method="post" autocomplete="off" enctype="multipart/form-data">
       <!-- 发起人：锁定当前登录人，服务端同样以 session 为准，防止冒名提交 -->
       <div class="lf-field">
         <label>发起人<span class="req">*</span></label>
@@ -49,6 +49,14 @@
       <div class="lf-field">
         <label>请假事由<span class="req">*</span></label>
         <textarea class="lf-textarea" name="leaveReason" required placeholder="请填写请假事由，审批人可在办理页看到此内容"></textarea>
+      </div>
+
+      <div class="lf-field">
+        <label>附件</label>
+        <div class="lf-tip">可上传最多5个相关附件，仅支持 PDF 格式，每个不超过 10MB</div>
+        <input type="file" name="attachment" id="attachmentInput" multiple accept="application/pdf,.pdf">
+        <div class="lf-tip" id="attachErr" style="display:none;color:#e53e3e;"></div>
+        <div class="lf-tip" id="attachOk" style="display:none;color:#38a169;white-space:pre-line;line-height:1.8;"></div>
       </div>
 
       <!-- 流转说明：节点顺序与 BPMN 中 userTask 绑定的 candidateGroups 一致 -->
@@ -85,6 +93,41 @@
     </form>
   </div>
 </div>
+
+<script>
+  // 附件前端预校验：只能给即时提示，真正的安全校验在服务端 AttachmentService
+  (function(){
+    var input = document.getElementById('attachmentInput');
+    var err = document.getElementById('attachErr');
+    var ok = document.getElementById('attachOk');
+    var MAX = 10 * 1024 * 1024; // 与服务端上限一致
+    input.addEventListener('change', function(){
+      err.style.display = 'none';
+      ok.style.display = 'none';
+      var files = input.files || [];
+      if (files.length === 0) return;
+      var names = [];
+      for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        if (!/\.pdf$/i.test(f.name)) {
+          err.textContent = '附件仅支持 PDF 格式：' + f.name;
+          err.style.display = 'block';
+          input.value = '';
+          return;
+        }
+        if (f.size > MAX) {
+          err.textContent = '附件超过 10MB：' + f.name;
+          err.style.display = 'block';
+          input.value = '';
+          return;
+        }
+        names.push(f.name + '（' + (f.size / 1024 / 1024).toFixed(2) + ' MB）');
+      }
+      ok.textContent = '已选择 ' + names.length + ' 个附件：\n· ' + names.join('\n· ') + '\n（随表单一并提交）';
+      ok.style.display = 'block';
+    });
+  })();
+</script>
 
 <div th:replace="~{fragments/statusBar :: statusBar}"></div>
 </body>

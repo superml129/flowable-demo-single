@@ -4,6 +4,11 @@ spring:
   # 开发期关闭模板缓存，改完 html 刷新页面即可生效（生产环境应改为 true）
   thymeleaf:
     cache: false
+  # 文件上传上限（Spring 默认只有 1MB，不改 PDF 基本传不上去）
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 52MB
   datasource:
     dynamic:
       primary: flowable # 默认数据源：flowable_demo（flowable引擎使用）
@@ -92,3 +97,6 @@ rocketmq:
 flow:
   remind:
     delay: 60s
+  # 附件（PDF）落盘目录，不存在会在首次保存时自动创建
+  attachment:
+    dir: D:/workspaces/flowable_demo/attachments

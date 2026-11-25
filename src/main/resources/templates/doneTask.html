@@ -19,13 +19,14 @@
 <script th:inline="javascript">
     /*<![CDATA[*/
     // 全局刷新表格函数，给分页组件调用
-    function reloadTable(pageNum, pageSize, sortField, sortOrder, assignee){
+    function reloadTable(pageNum, pageSize, sortField, sortOrder, assignee, bizKeyword){
         let params = new URLSearchParams();
         params.append('pageNum', pageNum);
         params.append('pageSize', pageSize);
         if(sortField) params.append('sortField', sortField);
         if(sortOrder) params.append('sortOrder', sortOrder);
         if(assignee !== undefined) params.append('assignee', assignee);
+        if(bizKeyword !== undefined) params.append('bizKeyword', bizKeyword);
 
         fetch('/todoTask/donePage?' + params.toString(), {
             headers: {

@@ -30,6 +30,8 @@
         <form class="search-form-inner">
             <span class="label-text">查询办理人：</span>
             <input type="text" name="assignee" th:value="${searchUser}" placeholder="请输入办理人账号"/>
+            <span class="label-text" style="margin-left:12px;">业务关键字：</span>
+            <input type="text" name="bizKeyword" th:value="${bizKeyword}" placeholder="附件ID等，模糊匹配"/>
             <input type="hidden" name="pageNum" th:value="${pageNum}"/>
             <input type="hidden" name="pageSize" th:value="${pageSize}"/>
             <input type="hidden" name="sortField" th:value="${sortField}"/>
@@ -111,6 +113,10 @@
             const input = document.querySelector('.search-form-inner input[name="assignee"]');
             return input?.value ?? '';
         }
+        function getSearchKeyword() {
+            const input = document.querySelector('.search-form-inner input[name="bizKeyword"]');
+            return input?.value ?? '';
+        }
         function tableCurrentSize() {
             return tableState('pageSize') || 10;
         }
@@ -131,11 +137,12 @@
         // 异步页面（todoTask.html）会在自己的 <script> 里重新定义 fetch 版 reloadTable，
         // 页面脚本后执行，会把这里的兜底实现覆盖掉，互不影响。
         if (typeof window.reloadTable !== 'function') {
-            window.reloadTable = function (pageNum, pageSize, sortField, sortOrder, assignee) {
+            window.reloadTable = function (pageNum, pageSize, sortField, sortOrder, assignee, bizKeyword) {
                 let href = tablePageUrl() + '?pageNum=' + pageNum + '&pageSize=' + pageSize;
                 if (sortField) href += '&sortField=' + encodeURIComponent(sortField);
                 if (sortOrder) href += '&sortOrder=' + encodeURIComponent(sortOrder);
                 if (assignee) href += '&assignee=' + encodeURIComponent(assignee);
+                if (bizKeyword) href += '&bizKeyword=' + encodeURIComponent(bizKeyword);
                 // tablePageUrl() 是后端渲染的根路径（如 /todoTask/toPage），子路径部署需补前缀
                 window.location.href = window.ctxUrl ? ctxUrl(href) : href;
             };
@@ -153,7 +160,7 @@
                     let curField = tableCurrentSortField();
                     let curOrder = tableCurrentSortOrder();
                     let newOrder = (field === curField && curOrder === 'asc') ? 'desc' : 'asc';
-                    reloadTable(1, tableCurrentSize(), field, newOrder, getSearchAssignee());
+                    reloadTable(1, tableCurrentSize(), field, newOrder, getSearchAssignee(), getSearchKeyword());
                     return;
                 }
 
@@ -168,7 +175,7 @@
                             alert(res);
                             // 完成后刷新表格，回到当前页
                             reloadTable(tableCurrentPage(), tableCurrentSize(),
-                                tableCurrentSortField(), tableCurrentSortOrder(), getSearchAssignee());
+                                tableCurrentSortField(), tableCurrentSortOrder(), getSearchAssignee(), getSearchKeyword());
                         })
                 }
             })
@@ -177,7 +184,7 @@
             document.addEventListener('submit', function (e) {
                 if (e.target && e.target.matches('.search-form-inner')) {
                     e.preventDefault();
-                    reloadTable(1, tableCurrentSize(), '', '', getSearchAssignee());
+                    reloadTable(1, tableCurrentSize(), '', '', getSearchAssignee(), getSearchKeyword());
                 }
             })
         }
